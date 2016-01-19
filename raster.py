@@ -112,4 +112,6 @@ def window_single(iterable):
 
 
 def window(*args):
+    if len(args) == 1:
+        return window_single(args[0])
     return zip(*[window_single(i) for i in args])

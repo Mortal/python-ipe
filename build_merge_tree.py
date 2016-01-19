@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import division, print_function
 
 from itertools import izip as zip
 from itertools import tee
@@ -29,12 +29,15 @@ slices = Slices()
 def main():
     elev_name = '/data/rasters/20150224/bug8.tif'
     rank_name = '/data/rasters/20150224/bug8-ranks.tif'
+    wsheds_name = '/data/rasters/20150224/bug8-watersheds.tif'
     output_name = '/data/rasters/degrees.tif'
     meta, elev = raster.iterrows(elev_name, meta=True)
     rank = raster.iterrows(rank_name, pi=raster.dummy_progress)
+    wsheds = raster.iterrows(wsheds_name, pi=raster.dummy_progress)
 
-    d = degrees_logged(elev, rank)
-    raster.raster_sink(output_name, d, np.uint32, meta)
+    # d = degrees_logged(elev, rank)
+    # raster.raster_sink(output_name, d, np.uint32, meta)
+    print(negative_saddles(elev, rank, wsheds))
 
 
 def elev_rank_lt(e1, r1, e2, r2):
@@ -66,7 +69,7 @@ def degrees(elev, rank):
     for (ae, be, ce), (ar, br, cr) in raster.window(elev, rank):
         # cmps[i, j, k] == True <=> center cell k is above neighbor [i, j]
         cmps = np.zeros((3, 3, len(be)))
-        isdata = be != get_nodata_value(be.dtype)
+        # isdata = be != get_nodata_value(be.dtype)
 
         for i, ie, ir in zip(cmps, (ae, be, ce), (ar, br, cr)):
             idx_other = slices[:-1, :, 1:]  # ie/ir indices of 'other' operand
@@ -148,6 +151,40 @@ def degrees_logged(elev, rank):
     print("Extremes: %s" % extremes)
     print("Sinks: %s" % sinks)
     print("Saddles: %s" % saddles)
+
+
+def negative_saddles(elev, rank, wsheds):
+    elev1, elev2 = tee(elev)
+    data = enumerate(zip(elev2, degrees(elev1, rank), raster.window(wsheds)))
+    result = []
+    for j, (z, deg, (wa, wb, wc)) in data:
+        saddle = dict()
+        neighbor_watersheds = np.concatenate(
+            [
+        for i in (deg > 1).nonzero()[0]:
+            i1 = max(i - 1, 0)
+            i2 = min(len(wb), i + 2)
+            w = set(np.unique((wa[i1:i2], wb[i1:i2], wc[i1:i2])))
+            w = sorted(w - set([0, get_nodata_value(wa.dtype)]))
+            for k1 in range(len(w)):
+                for k2 in range(k1 + 1, len(w)):
+                    e = (w[k1], w[k2])
+                    v = (z[i], j, i)
+                    saddle.setdefault(e, v)
+                    saddle[e] = min(saddle[e], v)
+        saddle2 = []
+        active = set(wb)
+        i = len(result)
+        for (w1, w2), v in saddle.items():
+            if w1 in active or w2 in active:
+                saddle2.append(((w1, w2), v))
+            else:
+                result.append(((w1, w2), v))
+        if i != len(result):
+            print(len(saddle2), len(result), result[i:])
+
+        saddle = dict(saddle2)
+    return saddle
 
 
 if __name__ == "__main__":
