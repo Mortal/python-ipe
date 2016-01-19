@@ -45,6 +45,10 @@ def elev_rank_lt(e1, r1, e2, r2):
     return lt
 
 
+def elev_rank_le(e1, r1, e2, r2):
+    return ~elev_rank_lt(e2, r2, e1, r1)
+
+
 def degrees(elev, rank):
     """Compute vertex degrees of (N, M) terrain
 
