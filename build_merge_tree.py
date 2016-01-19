@@ -63,9 +63,7 @@ def degrees(elev, rank):
         Entry [i][j] is 0 for source/sink, 1 for regular, d for d-saddle
     """
 
-    elev = raster.window(elev)
-    rank = raster.window(rank)
-    for (ae, be, ce), (ar, br, cr) in zip(elev, rank):
+    for (ae, be, ce), (ar, br, cr) in raster.window(elev, rank):
         # cmps[i, j, k] == True <=> center cell k is above neighbor [i, j]
         cmps = np.zeros((3, 3, len(be)))
         isdata = be != get_nodata_value(be.dtype)
