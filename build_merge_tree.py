@@ -68,27 +68,32 @@ def degrees(elev, rank):
         cmps = np.zeros((3, 3, len(be)))
         isdata = be != get_nodata_value(be.dtype)
 
-        counter = 0
         for i, ie, ir in zip(cmps, (ae, be, ce), (ar, br, cr)):
             idx_other = slices[:-1, :, 1:]  # ie/ir indices of 'other' operand
-            idx_self = slices[1:, :, :-1]  # be/br indices of 'self' operand
-            for ii, j1, j2 in zip(i, idx_other, idx_self):
+            # idx_self = slices[1:, :, :-1]  # be/br indices of 'self' operand
+            for ii, j1 in zip(i, idx_other):
                 e1 = ie[j1]
                 r1 = ir[j1]
+                if j1.stop == -1:
+                    # Comparing with left neighbor; add nodata on the left
+                    e1 = np.concatenate(([get_nodata_value(e1.dtype)], e1))
+                    r1 = np.concatenate(([get_nodata_value(r1.dtype)], r1))
+                elif j1.start == 1:
+                    # Comparing with right neighbor; add nodata on the right
+                    e1 = np.concatenate((e1, [get_nodata_value(e1.dtype)]))
+                    r1 = np.concatenate((r1, [get_nodata_value(r1.dtype)]))
                 # (e1,r1) is the [i, j] neighbor
-                e2 = be[j2]
-                r2 = br[j2]
-                # (e2,r2) is self
+                # (be,br) is self
 
-                # Ensure that first argument to lt is the one with higher
-                # raster order
+                # Raster order determines if we should use lt or le
                 if ie is ae or (ie is be and j1.start is None):
-                    ii[j1] = elev_rank_lt(e1, r1, e2, r2)
-                    assert counter < 5
+                    # neighbor is raster-less-than self,
+                    # so it suffices for it to be topo-less-or-equal
+                    ii[:] = elev_rank_le(e1, r1, be, br)
                 else:
-                    ii[j1] = ~elev_rank_lt(e2, r2, e1, r1)
-                    assert counter >= 5
-                counter += 1
+                    # neighbor is raster-greater-than self,
+                    # so it must be topo-strictly-less-than
+                    ii[:] = elev_rank_lt(e1, r1, be, br)
         cmps = np.asarray([
             cmps[0, 0],
             cmps[1, 0],
@@ -107,6 +112,7 @@ def degrees(elev, rank):
 
 
 def degrees_logged(elev, rank):
+    """Wrapper around degrees(elev, rank), outputting some statistics."""
     saddles = 0
     extremes = sinks = 0
     regulars = 0
@@ -122,7 +128,7 @@ def degrees_logged(elev, rank):
         elevnodata += (~isdata).sum()
         extreme = isdata & (d_row == 0)
         extremes += extreme.sum()
-        sink_right = elev_rank_lt(e_row[:-1], r_row[:-1], e_row[1:], r_row[1:])
+        sink_right = elev_rank_le(e_row[:-1], r_row[:-1], e_row[1:], r_row[1:])
         sink_left = elev_rank_lt(e_row[1:], r_row[1:], e_row[:-1], r_row[:-1])
         sink = (
             np.concatenate((sink_right, [False])) &
@@ -133,6 +139,8 @@ def degrees_logged(elev, rank):
         regulars += regular.sum()
         saddle = isdata & (d_row > 1)
         saddles += saddle.sum()
+        d_row[saddle] += 1
+        d_row[source] = 2
         yield d_row
     print("%s cells" % cells)
     print("%s data, %s nodata" % (elevdata, elevnodata))
