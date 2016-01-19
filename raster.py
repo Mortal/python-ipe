@@ -4,6 +4,8 @@ import os
 import sys
 import gdal
 
+from itertools import izip as zip
+
 import numpy as np
 
 
@@ -89,7 +91,7 @@ def nodata_like(row):
     return np.zeros_like(row) + get_nodata_value(row.dtype)
 
 
-def window(iterable):
+def window_single(iterable):
     try:
         row = next(iterable)
     except StopIteration:
@@ -107,3 +109,7 @@ def window(iterable):
             c[:] = nodata_like(b)
             more = False
         yield a, b, c
+
+
+def window(*args):
+    return zip(*[window_single(i) for i in args])
