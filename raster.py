@@ -3,6 +3,7 @@ from __future__ import division
 import os
 import sys
 import gdal
+import time
 
 from itertools import izip as zip
 
@@ -13,8 +14,15 @@ gdal.UseExceptions()
 
 
 def show_progress(name=""):
+    t = [0, 0, 0]
     def pi(i, n):
-        sys.stdout.write("%3d%% %s %12d/%d\r" % (i * 100 / n, name, i, n))
+        if t[0] == 0:
+            t[0] = time.time()
+        elif i % 10 == 0:
+            t[1] = time.time()
+            t[2] = i / (t[1] - t[0])
+        sys.stdout.write("%3d%% %s %12d/%d %g\r" %
+                         (i * 100 / n, name, i, n, t[2]))
         sys.stdout.flush()
         if i == n:
             print('')

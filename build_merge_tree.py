@@ -1,7 +1,7 @@
 from __future__ import division, print_function
 
 from itertools import izip as zip
-from itertools import tee
+from itertools import tee, groupby
 
 import numpy as np
 import raster
@@ -157,33 +157,57 @@ def negative_saddles(elev, rank, wsheds):
     elev1, elev2 = tee(elev)
     data = enumerate(zip(elev2, degrees(elev1, rank), raster.window(wsheds)))
     result = []
+    saddle = []
     for j, (z, deg, (wa, wb, wc)) in data:
-        saddle = dict()
-        neighbor_watersheds = np.concatenate(
-            [
-        for i in (deg > 1).nonzero()[0]:
-            i1 = max(i - 1, 0)
-            i2 = min(len(wb), i + 2)
-            w = set(np.unique((wa[i1:i2], wb[i1:i2], wc[i1:i2])))
-            w = sorted(w - set([0, get_nodata_value(wa.dtype)]))
+        neighbor_watersheds = []
+        nodata = get_nodata_value(wb.dtype)
+        for r in (wa, wb, wc):
+            for i in slices[:-1, :, 1:]:
+                if i.stop == -1:
+                    neighbor_watersheds.append(np.r_[nodata, r[i]])
+                elif i.start == 1:
+                    neighbor_watersheds.append(np.r_[r[i], nodata])
+                else:
+                    neighbor_watersheds.append(r[i])
+        neighbor_watersheds = np.transpose(neighbor_watersheds)
+        neighbor_watersheds[neighbor_watersheds == nodata] = 0
+        neighbor_watersheds.sort()
+        diff = neighbor_watersheds[:, :-1] != neighbor_watersheds[:, 1:]
+        ndiff = diff.sum(axis=1) + 1
+
+        for i in ((deg > 1) & (ndiff > 1)).nonzero()[0]:
+            w = set(np.unique(neighbor_watersheds[i]))
+            w = sorted(w)
+            assert len(w) > 1
             for k1 in range(len(w)):
                 for k2 in range(k1 + 1, len(w)):
                     e = (w[k1], w[k2])
                     v = (z[i], j, i)
-                    saddle.setdefault(e, v)
-                    saddle[e] = min(saddle[e], v)
+                    saddle.append((e, v))
+        saddle.sort()
         saddle2 = []
-        active = set(wb)
+        searches = []
+        res = [None]
+        for e, gr in groupby(saddle, key=lambda x: x[0]):
+            lowest = min(gr)
+            searches.append(e)
+            res.append(lowest)
+        res = np.array(res, dtype=np.object)[1:]
+        searches = np.asarray(searches)
+        active = np.unique(wc)
+        # print("Active: %s" % (active,))
+        indices = np.searchsorted(active, searches)
+        indices[indices == len(active)] = 0
+        found = (active[indices] == searches).any(axis=1)
+        # print("Searches:\n%s" % '\n'.join(
+        #     '%s %s' % (searchrow, foundrow)
+        #     for searchrow, foundrow in zip(searches, found)))
+        saddle = res[found].tolist()
+        # print("New saddle:\n%s" % (saddle,))
         i = len(result)
-        for (w1, w2), v in saddle.items():
-            if w1 in active or w2 in active:
-                saddle2.append(((w1, w2), v))
-            else:
-                result.append(((w1, w2), v))
+        result.extend(res[~found].tolist())
         if i != len(result):
-            print(len(saddle2), len(result), result[i:])
-
-        saddle = dict(saddle2)
+            print(len(saddle), len(result), result[i:])
     return saddle
 
 
