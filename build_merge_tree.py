@@ -11,15 +11,6 @@ import raster
 from raster import get_nodata_value, add_nodata_row
 
 
-def window(filename, meta=False):
-    meta, rows = raster.iterrows(filename, meta=True)
-    it = raster.window(rows)
-    if meta:
-        return meta, it
-    else:
-        return it
-
-
 class Slices(object):
     def __getitem__(self, slices):
         return slices
@@ -77,6 +68,29 @@ def main():
 
 
 def elev_rank_lt(e1, r1, e2, r2):
+    """Decide if a cell is below another cell given elevations and ranks.
+
+    Parameters
+    ----------
+    e1, e2 : float ndarrays of same shape
+    r1, r2 : integer ndarray, same shape as e1/e2 or empty
+        Elevations and ranks of cells to compare.
+        If r1.size == 0, ranks are assumed to be all equal.
+
+    Returns
+    -------
+    lt : bool ndarray, same shape as input
+        lt[I] == True <=> e1[I] < e2[I] or (e1[I] == e2[I] and r1[I] < r2[I])
+    """
+
+    e1, e2 = np.asarray(e1), np.asarray(e2)
+    r1, r2 = np.asarray(r1), np.asarray(r2)
+    assert e1.shape == e2.shape
+    assert r1.shape == r2.shape
+    if not r1.size:
+        return e1 < e2
+    assert r1.shape == e1.shape
+
     eq = e1 == e2
     lt = e1 < e2  # generally use elevations to decide less-than
     rlt = r1 < r2
