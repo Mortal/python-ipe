@@ -40,10 +40,40 @@ def main():
     # d = degrees_logged(elev, rank)
     # raster.raster_sink(output_name, d, np.uint32, meta)
 
-    ns = negative_saddles(elev, rank, wsheds)
-    edges, saddles = zip(*ns)
-    z, i, j = zip(*saddles)
-    np.savez_compressed('build_merge_tree.npz', edges=edges, z=z, i=i, j=j)
+    # ns = negative_saddles(elev, rank, wsheds)
+    # edges, saddles = zip(*ns)
+    # z, i, j = zip(*saddles)
+    # np.savez_compressed('build_merge_tree.npz', edges=edges, z=z, i=i, j=j)
+
+    o = np.load('build_merge_tree.npz')
+    edges = o['edges']
+    zs = o['z']
+    locs = np.c_[o['i'], o['j']]
+    idx = np.argsort(zs)
+    rep = dict()
+    depressions = dict()
+    points = []
+    for (w1, w2), z, loc in zip(edges[idx], zs[idx], locs[idx]):
+        saddle = (w1, w2, z, loc)
+        rep.setdefault(w1, w1)
+        while w1 != rep[w1]:
+            w1 = rep[w1] = rep[rep[w1]]
+        rep.setdefault(w2, w2)
+        while w2 != rep[w2]:
+            w2 = rep[w2] = rep[rep[w2]]
+        if w1 != w2:
+            d1 = depressions.pop(w1, (1, w1))
+            d2 = depressions.pop(w2, (1, w2))
+            rep[w2] = w1
+            depressions[w1] = (d1[0] + d2[0], saddle, d1, d2)
+            points.append((loc.tolist(), d1[0] + d2[0]))
+        else:
+            # print("Positive saddle %s" % (saddle,))
+            points.append((loc.tolist(), 0))
+    # print(depressions.keys())
+    print(len(depressions))
+    points.sort()
+    raster.points_to_raster(output_name, points, np.uint32, meta)
 
 
 def elev_rank_lt(e1, r1, e2, r2):

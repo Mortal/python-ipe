@@ -66,7 +66,7 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1):
         return it()
 
 
-def raster_sink(filename, iterable, dtype, meta):
+def write_raster(filename, f, dtype, meta):
     out_driver = gdal.GetDriverByName('GTiff')
     gdal_dtype = gdal.GetDataTypeByName(dtype.__name__)
 
@@ -82,8 +82,35 @@ def raster_sink(filename, iterable, dtype, meta):
     ds.SetProjection(meta.GetProjection())
     band = ds.GetRasterBand(1)
     band.SetNoDataValue(get_nodata_value(dtype))
-    for i, row in enumerate(iterable):
-        band.WriteArray(row.reshape(1, xsize), 0, i)
+    f(band)
+
+
+def raster_sink(filename, iterable, dtype, meta):
+    def f(band):
+        for i, row in enumerate(iterable):
+            band.WriteArray(row.reshape(1, -1), 0, i)
+
+    return write_raster(filename, f, dtype, meta)
+
+
+def points_to_raster(filename, iterable, dtype, meta):
+    def f():
+        current_row = 0
+        row = np.zeros(meta.RasterXSize, dtype=dtype)
+        row[:] = get_nodata_value(dtype)
+        for loc, z in iterable:
+            while current_row < loc[0]:
+                yield row
+                row[:] = get_nodata_value(dtype)
+                current_row += 1
+            row[loc[1]] = z
+        while current_row < meta.RasterYSize:
+            yield row
+            row[:] = get_nodata_value(dtype)
+            current_row += 1
+
+    return raster_sink(filename, f(), dtype, meta)
+
 
 
 def load(filename, pi=None):
