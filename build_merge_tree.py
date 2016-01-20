@@ -195,19 +195,17 @@ def negative_saddles(elev, rank, wsheds):
         res = np.array(res, dtype=np.object)[1:]
         searches = np.asarray(searches)
         active = np.unique(wc)
-        # print("Active: %s" % (active,))
         indices = np.searchsorted(active, searches)
         indices[indices == len(active)] = 0
         found = (active[indices] == searches).any(axis=1)
-        # print("Searches:\n%s" % '\n'.join(
-        #     '%s %s' % (searchrow, foundrow)
-        #     for searchrow, foundrow in zip(searches, found)))
         saddle = res[found].tolist()
-        # print("New saddle:\n%s" % (saddle,))
         i = len(result)
         result.extend(res[~found].tolist())
         if i != len(result):
             print(len(saddle), len(result), result[i:])
+            edges = set(e for e, v in result)
+            if len(edges) != len(result):
+                raise Exception("Non-unique edges in result")
     return saddle
 
 
