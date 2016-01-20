@@ -1,12 +1,14 @@
 from __future__ import division, print_function
 
+import collections
 from itertools import izip as zip
+from itertools import imap as map
 from itertools import tee, groupby
 
 import numpy as np
 import raster
 
-from raster import get_nodata_value
+from raster import get_nodata_value, add_nodata_row
 
 
 def window(filename, meta=False):
@@ -37,7 +39,11 @@ def main():
 
     # d = degrees_logged(elev, rank)
     # raster.raster_sink(output_name, d, np.uint32, meta)
-    print(negative_saddles(elev, rank, wsheds))
+
+    ns = negative_saddles(elev, rank, wsheds)
+    edges, saddles = zip(*ns)
+    z, i, j = zip(*saddles)
+    np.savez_compressed('build_merge_tree.npz', edges=edges, z=z, i=i, j=j)
 
 
 def elev_rank_lt(e1, r1, e2, r2):
@@ -155,7 +161,9 @@ def degrees_logged(elev, rank):
 
 def negative_saddles(elev, rank, wsheds):
     elev1, elev2 = tee(elev)
-    data = enumerate(zip(elev2, degrees(elev1, rank), raster.window(wsheds)))
+    deg_it = degrees(elev1, rank)
+    ws_it = raster.window(wsheds)
+    data = enumerate(zip(*map(add_nodata_row, (elev2, deg_it, ws_it))))
     result = []
     saddle = []
     for j, (z, deg, (wa, wb, wc)) in data:
@@ -184,29 +192,26 @@ def negative_saddles(elev, rank, wsheds):
                     e = (w[k1], w[k2])
                     v = (z[i], j, i)
                     saddle.append((e, v))
-        saddle.sort()
-        saddle2 = []
-        searches = []
-        res = [None]
-        for e, gr in groupby(saddle, key=lambda x: x[0]):
-            lowest = min(gr)
-            searches.append(e)
-            res.append(lowest)
-        res = np.array(res, dtype=np.object)[1:]
-        searches = np.asarray(searches)
-        active = np.unique(wc)
-        indices = np.searchsorted(active, searches)
-        indices[indices == len(active)] = 0
-        found = (active[indices] == searches).any(axis=1)
-        saddle = res[found].tolist()
-        i = len(result)
-        result.extend(res[~found].tolist())
-        if i != len(result):
-            print(len(saddle), len(result), result[i:])
-            edges = set(e for e, v in result)
-            if len(edges) != len(result):
-                raise Exception("Non-unique edges in result")
-    return saddle
+        if saddle:
+            saddle.sort()
+            saddle2 = []
+            searches = []
+            res = [None]
+            for e, gr in groupby(saddle, key=lambda x: x[0]):
+                searches.append(e)
+                res.append(min(gr))
+            res = np.array(res, dtype=np.object)[1:]
+            searches = np.asarray(searches)
+            active = np.unique([wb, wc])
+            if active[0] == 0:
+                active = active[1:]
+            indices = np.searchsorted(active, searches)
+            indices[indices == len(active)] = 0
+            found = (active[indices] == searches).any(axis=1)
+            saddle = res[found].tolist()
+            i = len(result)
+            result.extend(res[~found].tolist())
+    return result
 
 
 if __name__ == "__main__":

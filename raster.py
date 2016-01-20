@@ -6,6 +6,7 @@ import gdal
 import time
 
 from itertools import izip as zip
+from itertools import chain
 
 import numpy as np
 
@@ -34,7 +35,7 @@ def dummy_progress(i, n):
     pass
 
 
-def iterrows(filename, pi=None, meta=False):
+def iterrows(filename, pi=None, meta=False, buffer_rows=1):
     if pi is None:
         pi = show_progress(os.path.basename(filename))
     ds = gdal.Open(filename)
@@ -43,18 +44,21 @@ def iterrows(filename, pi=None, meta=False):
         # xsize = ds.RasterXSize
         nrows = ds.RasterYSize
         band = ds.GetRasterBand(1)
-        row = band.ReadAsArray(0, 0, win_ysize=1)
+        bufrows = min(buffer_rows, nrows)
+        row = band.ReadAsArray(0, 0, win_ysize=bufrows)
         if band.GetNoDataValue() != get_nodata_value(row.dtype):
             print("WARNING: Incorrect nodata value: %s != %s" %
                   (band.GetNoDataValue(), get_nodata_value(row.dtype)))
         progress = -1
-        for i in range(nrows):
-            band.ReadAsArray(0, i, win_ysize=1, buf_obj=row)
-            yield row.ravel()
-            p = (i + 1) * 1000 // nrows
-            if p > progress or i + 1 == nrows:
-                progress = p
-                pi(i + 1, nrows)
+        for i in range(0, nrows, bufrows):
+            j = min(nrows, i + bufrows)
+            for k in range(j - i):
+                band.ReadAsArray(0, i + k, win_ysize=1, buf_obj=row[k:k+1])
+                yield row[k]
+                p = (i + 1) * 1000 // nrows
+                if p > progress or i + 1 == nrows:
+                    progress = p
+                    pi(i + 1, nrows)
 
     if meta:
         return ds, it()
@@ -96,6 +100,7 @@ def get_nodata_value(dtype):
 
 
 def nodata_like(row):
+    row = np.asarray(row)
     return np.zeros_like(row) + get_nodata_value(row.dtype)
 
 
@@ -123,3 +128,12 @@ def window(*args):
     if len(args) == 1:
         return window_single(args[0])
     return zip(*[window_single(i) for i in args])
+
+
+def add_nodata_row(iterable):
+    try:
+        row = next(iterable)
+    except StopIteration:
+        return []
+    nodata_row = nodata_like(row)
+    return chain([row], iterable, [nodata_row])
