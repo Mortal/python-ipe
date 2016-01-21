@@ -228,14 +228,13 @@ def negative_saddles(elev, rank, wsheds):
         diff = neighbor_watersheds[:, :-1] != neighbor_watersheds[:, 1:]
         ndiff = diff.sum(axis=1) + 1
 
-        for i in ((deg > 1) & (ndiff > 1)).nonzero()[0]:
-            w = set(np.unique(neighbor_watersheds[i]))
-            w = sorted(w)
+        for i in (ndiff > 1).nonzero()[0]:
+            w = neighbor_watersheds[i, :-1][diff[i]].tolist()
             assert len(w) > 1
             for k1 in range(len(w)):
                 for k2 in range(k1 + 1, len(w)):
                     e = (w[k1], w[k2])
-                    v = (z[i], j, i)
+                    v = (z[orig_idxs[i]], j, orig_idxs[i])
                     saddle.append((e, v))
         if saddle:
             saddle.sort()
