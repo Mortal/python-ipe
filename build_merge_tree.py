@@ -8,7 +8,7 @@ from itertools import tee, groupby
 import numpy as np
 import raster
 
-from raster import get_nodata_value, add_nodata_row
+from raster import get_nodata_value, add_nodata_row, peek_row
 
 
 class Slices(object):
@@ -137,16 +137,17 @@ def degrees(elev, rank):
         Entry [i][j] is 0 for source/sink, 1 for regular, d for d-saddle
     """
 
-    n_elev = n_rank = cmps = cmps2 = None
+    row, elev = peek_row(elev)
+    n_elev = np.zeros((3, 3, len(row)), dtype=row.dtype)
+    n_elev += get_nodata_value(n_elev.dtype)
+    row, rank = peek_row(rank)
+    n_rank = np.zeros((3, 3, len(row)), dtype=row.dtype)
+    n_rank += get_nodata_value(n_rank.dtype)
+    cmps = np.zeros((3, 3, len(row)), dtype=np.bool)
+    cmps2 = np.zeros((9, len(row)), dtype=np.bool)
+    cmp_same = np.zeros((8, len(row)), dtype=np.bool)
+    cmp_diffs = np.zeros(len(row), dtype=np.uint8)
     for (ae, be, ce), (ar, br, cr) in raster.window(elev, rank):
-        if n_elev is None:
-            n_elev = np.zeros((3, 3, len(be)), dtype=be.dtype)
-            n_elev += get_nodata_value(be.dtype)
-        if n_rank is None:
-            n_rank = np.zeros((3, 3, len(br)), dtype=br.dtype)
-            n_rank += get_nodata_value(br.dtype)
-        if cmps is None:
-            cmps = np.zeros((3, 3, len(be)), dtype=np.bool)
         neighbors(ae, be, ce, n_elev)
         neighbors(ar, br, cr, n_rank)
         for i in range(3):
@@ -157,18 +158,15 @@ def degrees(elev, rank):
                 else:
                     cmps[i, j, :] = elev_rank_lt(
                         n_elev[i, j], n_rank[i, j], be, br)
-        if cmps2 is None:
-            cmps2 = cmps[
+        take_output(
+            cmps,
+            [
                 [0, 1, 2, 2, 2, 1, 0, 0, 0],
                 [0, 0, 0, 1, 2, 2, 2, 1, 0],
-            ]
-        else:
-            cmps2[:] = cmps[
-                [0, 1, 2, 2, 2, 1, 0, 0, 0],
-                [0, 0, 0, 1, 2, 2, 2, 1, 0],
-            ]
-        cmp_same = cmps2[:-1, :] == cmps2[1:, :]
-        cmp_diffs = np.sum(~cmp_same, axis=0)
+            ],
+            out=cmps2)
+        np.equal(cmps2[:-1, :], cmps2[1:, :], out=cmp_same)
+        np.sum(~cmp_same, axis=0, out=cmp_diffs)
         assert np.all(cmp_diffs % 2 == 0)
         yield cmp_diffs / 2
 
