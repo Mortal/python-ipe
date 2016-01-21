@@ -31,15 +31,18 @@ def main():
     # d = degrees_logged(elev, rank)
     # raster.raster_sink(output_name, d, np.uint32, meta)
 
-    # ns = negative_saddles(elev, rank, wsheds)
-    # edges, saddles = zip(*ns)
-    # z, i, j = zip(*saddles)
-    # np.savez_compressed('build_merge_tree.npz', edges=edges, z=z, i=i, j=j)
+    ns = negative_saddles(elev, rank, wsheds)
+    edges, saddles = zip(*ns)
+    zs, loc_i, loc_j = zip(*saddles)
+    zs = np.asarray(zs)
+    locs = np.c_[loc_i, loc_j]
+    # np.savez_compressed('build_merge_tree.npz', edges=edges, z=zs, i=i, j=j)
 
-    o = np.load('build_merge_tree.npz')
-    edges = o['edges']
-    zs = o['z']
-    locs = np.c_[o['i'], o['j']]
+    # o = np.load('build_merge_tree.npz')
+    # edges = o['edges']
+    # zs = o['z']
+    # locs = np.c_[o['i'], o['j']]
+    edges = np.asarray(edges)
     idx = np.argsort(zs)
     rep = dict()
     depressions = dict()
