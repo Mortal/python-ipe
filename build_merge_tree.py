@@ -214,19 +214,15 @@ def negative_saddles(elev, rank, wsheds):
     result = []
     saddle = []
     for j, (z, deg, (wa, wb, wc)) in data:
+        s = deg > 1
+        orig_idxs = s.nonzero()[0]
+        s_n = len(orig_idxs)
         nodata = get_nodata_value(wb.dtype)
-        neighbor_watersheds = np.zeros((len(wb), 9), dtype=wb.dtype)
-        c = 0
-        for r in (wa, wb, wc):
-            for i in slices[:-1, :, 1:]:
-                d = neighbor_watersheds[:, c]
-                c += 1
-                if i.stop == -1:
-                    d[1:] = r[i]
-                elif i.start == 1:
-                    d[:-1] = r[i]
-                else:
-                    d[:] = r[i]
+        neighbor_watersheds = np.zeros((s_n, 9), dtype=wb.dtype)
+        for c, r in enumerate((wa, wb, wc)):
+            neighbor_watersheds[1:, 3*c] = r[:-1][s[1:]]
+            neighbor_watersheds[:, 3*c+1] = r[s]
+            neighbor_watersheds[:-1, 3*c+2] = r[1:][s[:-1]]
         neighbor_watersheds[neighbor_watersheds == nodata] = 0
         neighbor_watersheds.sort()
         diff = neighbor_watersheds[:, :-1] != neighbor_watersheds[:, 1:]
