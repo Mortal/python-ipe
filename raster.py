@@ -15,13 +15,16 @@ gdal.UseExceptions()
 
 
 def show_progress(name=""):
-    t = [0, 0, 0]
+    t = [0, 0, 0, 0]
+    every = 100
     def pi(i, n):
         if t[0] == 0:
             t[0] = time.time()
-        elif i % 10 == 0:
+            t[3] = i + every
+        elif i >= t[3]:
             t[1] = time.time()
             t[2] = i / (t[1] - t[0])
+            t[3] = i + every
         sys.stdout.write("%3d%% %s %12d/%d %g\r" %
                          (i * 100 / n, name, i, n, t[2]))
         sys.stdout.flush()
