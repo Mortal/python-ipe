@@ -118,6 +118,11 @@ def neighbors(a, b, c, out):
     return out
 
 
+def take_output(a, indices, out):
+    for i, j in zip(zip(*indices), out):
+        j[:] = a[i]
+
+
 def degrees(elev, rank):
     """Compute vertex degrees of (N, M) terrain
 
