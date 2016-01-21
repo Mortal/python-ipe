@@ -167,3 +167,8 @@ def add_nodata_row(iterable):
         return []
     nodata_row = nodata_like(row)
     return chain([row], iterable, [nodata_row])
+
+
+def peek_row(iterable):
+    row = next(iterable)
+    return row, chain([row], iterable)
