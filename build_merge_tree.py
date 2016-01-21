@@ -70,7 +70,7 @@ def main():
     raster.points_to_raster(output_name, points, np.uint32, meta)
 
 
-def elev_rank_lt(e1, r1, e2, r2):
+def elev_rank_lt(e1, r1, e2, r2, out=None, buf=None):
     """Decide if a cell is below another cell given elevations and ranks.
 
     Parameters
@@ -94,15 +94,28 @@ def elev_rank_lt(e1, r1, e2, r2):
         return e1 < e2
     assert r1.shape == e1.shape
 
-    eq = e1 == e2
-    lt = e1 < e2  # generally use elevations to decide less-than
-    rlt = r1 < r2
+    if buf is None:
+        eq = e1 == e2
+    else:
+        eq = np.equal(e1, e2, out=buf[0])
+    if out is None:
+        lt = e1 < e2  # generally use elevations to decide less-than
+    else:
+        lt = np.less(e1, e2, out=out)
+    if buf is None:
+        rlt = r1 < r2
+    else:
+        rlt = np.less(r1, r2, out=buf[1])
     lt[eq] = rlt[eq]  # but use ranks when elevs are equal
     return lt
 
 
-def elev_rank_le(e1, r1, e2, r2):
-    return ~elev_rank_lt(e2, r2, e1, r1)
+def elev_rank_le(e1, r1, e2, r2, buf=None, out=None):
+    if out is None:
+        return ~elev_rank_lt(e2, r2, e1, r1, buf=buf)
+    else:
+        elev_rank_lt(e2, r2, e1, r1, out=out, buf=buf)
+        return np.invert(out, out=out)
 
 
 def neighbors(a, b, c, out):
@@ -116,6 +129,22 @@ def neighbors(a, b, c, out):
     out[2, 1, :] = c[:]
     out[2, 2, :-1] = c[1:]
     return out
+
+
+def neighbors_masked(a, b, c, m, out):
+    assert a.shape == b.shape == c.shape == m.shape
+    assert out.shape == (3, 3, len(a))
+    i = slice(1, None) if m[0] else slice(None, None)
+    j = slice(None, -1) if m[-1] else slice(None, None)
+    out[0, 0, i] = a[:-1][m[1:]]
+    out[0, 1, :] = a[m]
+    out[0, 2, j] = a[1:][m[:-1]]
+    out[1, 0, i] = b[:-1][m[1:]]
+    out[1, 1, :] = b[m]
+    out[1, 2, j] = b[1:][m[:-1]]
+    out[2, 0, i] = c[:-1][m[1:]]
+    out[2, 1, :] = c[m]
+    out[2, 2, j] = c[1:][m[:-1]]
 
 
 def take_output(a, indices, out):
@@ -147,17 +176,20 @@ def degrees(elev, rank):
     cmps2 = np.zeros((9, len(row)), dtype=np.bool)
     cmp_same = np.zeros((8, len(row)), dtype=np.bool)
     cmp_diffs = np.zeros(len(row), dtype=np.uint8)
+    elev_rank_buf = np.zeros((2, len(row)), dtype=np.bool)
     for (ae, be, ce), (ar, br, cr) in raster.window(elev, rank):
-        neighbors(ae, be, ce, n_elev)
-        neighbors(ar, br, cr, n_rank)
+        neighbors(ae, be, ce, out=n_elev)
+        neighbors(ar, br, cr, out=n_rank)
         for i in range(3):
             for j in range(3):
                 if (i, j) < (1, 1):
-                    cmps[i, j, :] = elev_rank_le(
-                        n_elev[i, j], n_rank[i, j], be, br)
+                    elev_rank_le(
+                        n_elev[i, j], n_rank[i, j], be, br,
+                        out=cmps[i, j], buf=elev_rank_buf)
                 else:
-                    cmps[i, j, :] = elev_rank_lt(
-                        n_elev[i, j], n_rank[i, j], be, br)
+                    elev_rank_lt(
+                        n_elev[i, j], n_rank[i, j], be, br,
+                        out=cmps[i, j], buf=elev_rank_buf)
         take_output(
             cmps,
             [
@@ -168,7 +200,7 @@ def degrees(elev, rank):
         np.equal(cmps2[:-1, :], cmps2[1:, :], out=cmp_same)
         np.sum(~cmp_same, axis=0, out=cmp_diffs)
         assert np.all(cmp_diffs % 2 == 0)
-        yield cmp_diffs / 2
+        yield np.divide(cmp_diffs, 2, out=cmp_diffs)
 
 
 def degrees_logged(elev, rank):
@@ -212,31 +244,28 @@ def degrees_logged(elev, rank):
 
 def negative_saddles(elev, rank, wsheds):
     elev1, elev2 = tee(elev)
+    row, wsheds = peek_row(wsheds)
     deg_it = degrees(elev1, rank)
     ws_it = raster.window(wsheds)
     data = enumerate(zip(*map(add_nodata_row, (elev2, deg_it, ws_it))))
     result = []
     saddle = []
+    neighbor_watersheds = np.zeros((9, len(row)), dtype=row.dtype)
     for j, (z, deg, (wa, wb, wc)) in data:
         s = deg > 1
         orig_idxs = s.nonzero()[0]
         s_n = len(orig_idxs)
         nodata = get_nodata_value(wb.dtype)
-        neighbor_watersheds = np.zeros((s_n, 9), dtype=wb.dtype)
-        for c, r in enumerate((wa, wb, wc)):
-            i = slice(1, None) if s[0] else slice(None, None)
-            neighbor_watersheds[i, 3*c] = r[:-1][s[1:]]
-            neighbor_watersheds[:, 3*c+1] = r[s]
-            i = slice(None, -1) if s[-1] else slice(None, None)
-            neighbor_watersheds[i, 3*c+2] = r[1:][s[:-1]]
+        neighbors_masked(wa, wb, wc, s,
+                         out=neighbor_watersheds[:s_n].reshape((3, 3, -1)))
         neighbor_watersheds[neighbor_watersheds == nodata] = 0
-        neighbor_watersheds.sort()
-        diff = neighbor_watersheds[:, :-1] != neighbor_watersheds[:, 1:]
-        diff = np.c_[np.repeat(True, len(neighbor_watersheds)), diff]
-        ndiff = diff.sum(axis=1)
+        neighbor_watersheds.sort(axis=0)
+        diff = neighbor_watersheds[:-1, :] != neighbor_watersheds[1:, :]
+        diff = np.r_[np.repeat(True, len(neighbor_watersheds)), diff]
+        ndiff = diff.sum(axis=0)
 
         for i in (ndiff > 1).nonzero()[0]:
-            w = neighbor_watersheds[i][diff[i]].tolist()
+            w = neighbor_watersheds[:, i][diff[i]].tolist()
             assert len(w) > 1
             for k1 in range(len(w)):
                 for k2 in range(k1 + 1, len(w)):
