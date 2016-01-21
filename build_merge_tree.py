@@ -105,6 +105,19 @@ def elev_rank_le(e1, r1, e2, r2):
     return ~elev_rank_lt(e2, r2, e1, r1)
 
 
+def neighbors(a, b, c, out):
+    out[0, 0, 1:] = a[:-1]
+    out[0, 1, :] = a[:]
+    out[0, 2, :-1] = a[1:]
+    out[1, 0, 1:] = b[:-1]
+    out[1, 1, :] = b[:]
+    out[1, 2, :-1] = b[1:]
+    out[2, 0, 1:] = c[:-1]
+    out[2, 1, :] = c[:]
+    out[2, 2, :-1] = c[1:]
+    return out
+
+
 def degrees(elev, rank):
     """Compute vertex degrees of (N, M) terrain
 
@@ -119,49 +132,37 @@ def degrees(elev, rank):
         Entry [i][j] is 0 for source/sink, 1 for regular, d for d-saddle
     """
 
+    n_elev = n_rank = cmps = cmps2 = None
     for (ae, be, ce), (ar, br, cr) in raster.window(elev, rank):
-        # cmps[i, j, k] == True <=> center cell k is above neighbor [i, j]
-        cmps = np.zeros((3, 3, len(be)))
-        # isdata = be != get_nodata_value(be.dtype)
-
-        for i, ie, ir in zip(cmps, (ae, be, ce), (ar, br, cr)):
-            idx_other = slices[:-1, :, 1:]  # ie/ir indices of 'other' operand
-            # idx_self = slices[1:, :, :-1]  # be/br indices of 'self' operand
-            for ii, j1 in zip(i, idx_other):
-                e1 = ie[j1]
-                r1 = ir[j1]
-                if j1.stop == -1:
-                    # Comparing with left neighbor; add nodata on the left
-                    e1 = np.concatenate(([get_nodata_value(e1.dtype)], e1))
-                    r1 = np.concatenate(([get_nodata_value(r1.dtype)], r1))
-                elif j1.start == 1:
-                    # Comparing with right neighbor; add nodata on the right
-                    e1 = np.concatenate((e1, [get_nodata_value(e1.dtype)]))
-                    r1 = np.concatenate((r1, [get_nodata_value(r1.dtype)]))
-                # (e1,r1) is the [i, j] neighbor
-                # (be,br) is self
-
-                # Raster order determines if we should use lt or le
-                if ie is ae or (ie is be and j1.start is None):
-                    # neighbor is raster-less-than self,
-                    # so it suffices for it to be topo-less-or-equal
-                    ii[:] = elev_rank_le(e1, r1, be, br)
+        if n_elev is None:
+            n_elev = np.zeros((3, 3, len(be)), dtype=be.dtype)
+            n_elev += get_nodata_value(be.dtype)
+        if n_rank is None:
+            n_rank = np.zeros((3, 3, len(br)), dtype=br.dtype)
+            n_rank += get_nodata_value(br.dtype)
+        if cmps is None:
+            cmps = np.zeros((3, 3, len(be)), dtype=np.bool)
+        neighbors(ae, be, ce, n_elev)
+        neighbors(ar, br, cr, n_rank)
+        for i in range(3):
+            for j in range(3):
+                if (i, j) < (1, 1):
+                    cmps[i, j, :] = elev_rank_le(
+                        n_elev[i, j], n_rank[i, j], be, br)
                 else:
-                    # neighbor is raster-greater-than self,
-                    # so it must be topo-strictly-less-than
-                    ii[:] = elev_rank_lt(e1, r1, be, br)
-        cmps = np.asarray([
-            cmps[0, 0],
-            cmps[1, 0],
-            cmps[2, 0],
-            cmps[2, 1],
-            cmps[2, 2],
-            cmps[1, 2],
-            cmps[0, 2],
-            cmps[0, 1],
-            cmps[0, 0],
-        ])
-        cmp_same = cmps[:-1, :] == cmps[1:, :]
+                    cmps[i, j, :] = elev_rank_lt(
+                        n_elev[i, j], n_rank[i, j], be, br)
+        if cmps2 is None:
+            cmps2 = cmps[
+                [0, 1, 2, 2, 2, 1, 0, 0, 0],
+                [0, 0, 0, 1, 2, 2, 2, 1, 0],
+            ]
+        else:
+            cmps2[:] = cmps[
+                [0, 1, 2, 2, 2, 1, 0, 0, 0],
+                [0, 0, 0, 1, 2, 2, 2, 1, 0],
+            ]
+        cmp_same = cmps2[:-1, :] == cmps2[1:, :]
         cmp_diffs = np.sum(~cmp_same, axis=0)
         assert np.all(cmp_diffs % 2 == 0)
         yield cmp_diffs / 2
