@@ -38,7 +38,7 @@ def dummy_progress(i, n):
     pass
 
 
-def iterrows(filename, pi=None, meta=False, buffer_rows=1):
+def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
     if pi is None:
         pi = show_progress(os.path.basename(filename))
     ds = gdal.Open(filename)
@@ -56,7 +56,10 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1):
         for i in range(0, nrows, bufrows):
             j = min(nrows, i + bufrows)
             for k in range(j - i):
-                band.ReadAsArray(0, i + k, win_ysize=1, buf_obj=row[k:k+1])
+                src_row = i + k
+                if reverse:
+                    src_row = nrows - src_row - 1
+                band.ReadAsArray(0, src_row, win_ysize=1, buf_obj=row[k:k+1])
                 yield row[k]
                 p = (i + 1) * 1000 // nrows
                 if p > progress or i + 1 == nrows:
