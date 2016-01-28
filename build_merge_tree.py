@@ -133,7 +133,7 @@ def neighbors(a, b, c, out):
 
 def neighbors_masked(a, b, c, m, out):
     assert a.shape == b.shape == c.shape == m.shape
-    assert out.shape == (3, 3, len(a))
+    assert out.shape == (3, 3, len(m.nonzero()[0]))
     i = slice(1, None) if m[0] else slice(None, None)
     j = slice(None, -1) if m[-1] else slice(None, None)
     out[0, 0, i] = a[:-1][m[1:]]
@@ -257,15 +257,16 @@ def negative_saddles(elev, rank, wsheds):
         s_n = len(orig_idxs)
         nodata = get_nodata_value(wb.dtype)
         neighbors_masked(wa, wb, wc, s,
-                         out=neighbor_watersheds[:s_n].reshape((3, 3, -1)))
+                         out=neighbor_watersheds[:, :s_n].reshape((3, 3, -1)))
         neighbor_watersheds[neighbor_watersheds == nodata] = 0
         neighbor_watersheds.sort(axis=0)
-        diff = neighbor_watersheds[:-1, :] != neighbor_watersheds[1:, :]
-        diff = np.r_[np.repeat(True, len(neighbor_watersheds)), diff]
+        diff = neighbor_watersheds[:-1, :s_n] != neighbor_watersheds[1:, :s_n]
+        ts = np.repeat(True, s_n)
+        diff = np.r_[ts.reshape((1, s_n)), diff]
         ndiff = diff.sum(axis=0)
 
         for i in (ndiff > 1).nonzero()[0]:
-            w = neighbor_watersheds[:, i][diff[i]].tolist()
+            w = neighbor_watersheds[:, i][diff[:, i]].tolist()
             assert len(w) > 1
             for k1 in range(len(w)):
                 for k2 in range(k1 + 1, len(w)):
