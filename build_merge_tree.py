@@ -298,7 +298,8 @@ def negative_saddles(elev, rank, wsheds):
         s_n = len(orig_idxs)
         neighbors_masked(wa, wb, wc, saddle,
                          out=neighbor_watersheds[:, :s_n].reshape((3, 3, -1)))
-        neighbor_watersheds[neighbor_watersheds == nodata] = 0
+        nodatamask = neighbor_watersheds == nodata
+        neighbor_watersheds[nodatamask] = 0
         neighbor_watersheds.sort(axis=0)
         diff = neighbor_watersheds[:-1, :s_n] != neighbor_watersheds[1:, :s_n]
         ts = np.repeat(True, s_n)
