@@ -1,5 +1,9 @@
 from __future__ import division, print_function
 
+import time
+import datetime
+import contextlib
+import subprocess
 import collections
 from itertools import izip as zip
 from itertools import imap as map
@@ -17,6 +21,36 @@ class Slices(object):
 
 
 slices = Slices()
+
+
+@contextlib.contextmanager
+def log_time():
+    now = datetime.datetime.now()
+    rev = subprocess.check_output(
+        ('git', 'rev-parse', 'HEAD'),
+        universal_newlines=True).strip()[:7]
+    returncode = subprocess.call(
+        ('git', 'diff', '--quiet', 'build_merge_tree.py'),
+        stdin=subprocess.PIPE)
+    if returncode != 0:
+        rev += '-dirty'
+    with open('build_merge_tree_time.txt', 'a') as fp:
+        fp.write('%s %s ' % (rev, now))
+        t1 = time.time()
+        try:
+            yield
+        except KeyboardInterrupt:
+            fp.write("CTRL-C")
+            raise
+        except Exception as e:
+            fp.write(str(e))
+            raise
+        else:
+            t2 = time.time()
+            fp.write('done! %s' % (t2 - t1,))
+        finally:
+            fp.write('\n')
+            fp.flush()
 
 
 def main():
@@ -296,4 +330,5 @@ def negative_saddles(elev, rank, wsheds):
 
 
 if __name__ == "__main__":
-    main()
+    with log_time():
+        main()
