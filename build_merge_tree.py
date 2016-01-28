@@ -291,11 +291,11 @@ def negative_saddles(elev, rank, wsheds):
     saddle = []
     neighbor_watersheds = np.zeros((9, len(row)), dtype=row.dtype)
     saddle = np.zeros(len(row), dtype=np.bool)
+    nodata = get_nodata_value(np.uint32)
     for j, (z, deg, (wa, wb, wc)) in data:
         np.greater(deg, 1, out=saddle)
         orig_idxs = saddle.nonzero()[0]
         s_n = len(orig_idxs)
-        nodata = get_nodata_value(wb.dtype)
         neighbors_masked(wa, wb, wc, saddle,
                          out=neighbor_watersheds[:, :s_n].reshape((3, 3, -1)))
         neighbor_watersheds[neighbor_watersheds == nodata] = 0
