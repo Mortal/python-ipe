@@ -247,7 +247,7 @@ def negative_saddles(elev, rank, wsheds):
     row, wsheds = peek_row(wsheds)
     deg_it = degrees(elev1, rank)
     ws_it = raster.window(wsheds)
-    data = enumerate(zip(*map(add_nodata_row, (elev2, deg_it, ws_it))))
+    data = enumerate(zip(*list(map(add_nodata_row, (elev2, deg_it, ws_it)))))
     result = []
     saddle = []
     neighbor_watersheds = np.zeros((9, len(row)), dtype=row.dtype)
