@@ -321,6 +321,8 @@ def negative_saddles(elev, rank, wsheds):
             saddle_list.sort()
             saddle2 = []
             searches = []
+
+            # Add None to ensure that np.array(res) is a 1d array of np.object
             res = [None]
             for e, gr in groupby(saddle_list, key=lambda x: x[0]):
                 searches.append(e)
