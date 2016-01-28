@@ -116,8 +116,9 @@ def elev_rank_lt(e1, r1, e2, r2, out=None, buf=None):
 
     Returns
     -------
-    lt : bool ndarray, same shape as input
-        lt[I] == True <=> e1[I] < e2[I] or (e1[I] == e2[I] and r1[I] < r2[I])
+    lt : float32 ndarray, same shape as input
+        signbit(lt[I]) <=> e1[I] < e2[I] or (e1[I] == e2[I] and r1[I] < r2[I])
+        lt[I] == e1[I] - e2[I]
     """
 
     e1, e2 = np.asarray(e1), np.asarray(e2)
@@ -133,23 +134,27 @@ def elev_rank_lt(e1, r1, e2, r2, out=None, buf=None):
     else:
         eq = np.equal(e1, e2, out=buf[0])
     if out is None:
-        lt = e1 < e2  # generally use elevations to decide less-than
+        lt = e1 - e2  # generally use elevations to decide less-than
     else:
-        lt = np.less(e1, e2, out=out)
+        lt = np.subtract(e1, e2, out=out)
     if buf is None:
         rlt = r1 < r2
     else:
         rlt = np.less(r1, r2, out=buf[1])
-    lt[eq] = rlt[eq]  # but use ranks when elevs are equal
+    np.logical_and(eq, rlt, out=rlt)
+    lt[rlt] = -0.0  # but use ranks when elevs are equal
+    np.invert(rlt, out=rlt)
+    np.logical_and(eq, rlt, out=rlt)
+    lt[rlt] = 0.0
     return lt
 
 
 def elev_rank_le(e1, r1, e2, r2, buf=None, out=None):
     if out is None:
-        return ~elev_rank_lt(e2, r2, e1, r1, buf=buf)
+        return -elev_rank_lt(e2, r2, e1, r1, buf=buf)
     else:
         elev_rank_lt(e2, r2, e1, r1, out=out, buf=buf)
-        return np.invert(out, out=out)
+        return np.negative(out, out=out)
 
 
 def neighbors(a, b, c, out):
@@ -206,7 +211,7 @@ def degrees(elev, rank):
     row, rank = peek_row(rank)
     n_rank = np.zeros((3, 3, len(row)), dtype=row.dtype)
     n_rank += get_nodata_value(n_rank.dtype)
-    cmps = np.zeros((3, 3, len(row)), dtype=np.bool)
+    cmps = np.zeros((3, 3, len(row)), dtype=np.float32)
     cmps2 = np.zeros((9, len(row)), dtype=np.bool)
     cmp_same = np.zeros((8, len(row)), dtype=np.bool)
     cmp_diffs = np.zeros(len(row), dtype=np.uint8)
@@ -225,7 +230,7 @@ def degrees(elev, rank):
                         n_elev[i, j], n_rank[i, j], be, br,
                         out=cmps[i, j], buf=elev_rank_buf)
         take_output(
-            cmps,
+            np.signbit(cmps),
             [
                 [0, 1, 2, 2, 2, 1, 0, 0, 0],
                 [0, 0, 0, 1, 2, 2, 2, 1, 0],
