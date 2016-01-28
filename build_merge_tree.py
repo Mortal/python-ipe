@@ -290,8 +290,9 @@ def negative_saddles(elev, rank, wsheds):
     result = []
     saddle = []
     neighbor_watersheds = np.zeros((9, len(row)), dtype=row.dtype)
+    saddle = np.zeros(len(row), dtype=np.bool)
     for j, (z, deg, (wa, wb, wc)) in data:
-        saddle = deg > 1
+        np.greater(deg, 1, out=saddle)
         orig_idxs = saddle.nonzero()[0]
         s_n = len(orig_idxs)
         nodata = get_nodata_value(wb.dtype)
