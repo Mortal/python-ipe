@@ -289,6 +289,8 @@ def negative_saddles(elev, rank, wsheds):
     data = enumerate(zip(*list(map(add_nodata_row, (elev2, deg_it, ws_it)))))
     result = []
     neighbor_watersheds_buf = np.zeros((9, len(row)), dtype=row.dtype)
+    diff_buf = np.ones((9, len(row)), dtype=np.bool)
+    ndiff_buf = np.ones(len(row), dtype=np.int64)
     saddle = np.zeros(len(row), dtype=np.bool)
     nodata = get_nodata_value(np.uint32)
     for j, (z, deg, (wa, wb, wc)) in data:
@@ -300,10 +302,11 @@ def negative_saddles(elev, rank, wsheds):
                          out=neighbor_watersheds.reshape((3, 3, -1)))
         neighbor_watersheds[neighbor_watersheds == nodata] = 0
         neighbor_watersheds.sort(axis=0)
-        diff = neighbor_watersheds[:-1] != neighbor_watersheds[1:]
-        ts = np.repeat(True, s_n)
-        diff = np.r_[ts.reshape((1, s_n)), diff]
-        ndiff = diff.sum(axis=0)
+        diff = diff_buf[:, :s_n]
+        np.not_equal(neighbor_watersheds[:-1], neighbor_watersheds[1:],
+                     out=diff[1:])
+        ndiff = ndiff_buf[:s_n]
+        diff.sum(axis=0, out=ndiff)
 
         saddle_list = []
         for i in (ndiff > 1).nonzero()[0]:
