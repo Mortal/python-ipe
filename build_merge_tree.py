@@ -289,19 +289,19 @@ def negative_saddles(elev, rank, wsheds):
     data = enumerate(zip(*list(map(add_nodata_row, (elev2, deg_it, ws_it)))))
     result = []
     saddle = []
-    neighbor_watersheds = np.zeros((9, len(row)), dtype=row.dtype)
+    neighbor_watersheds_buf = np.zeros((9, len(row)), dtype=row.dtype)
     saddle = np.zeros(len(row), dtype=np.bool)
     nodata = get_nodata_value(np.uint32)
     for j, (z, deg, (wa, wb, wc)) in data:
         np.greater(deg, 1, out=saddle)
         orig_idxs = saddle.nonzero()[0]
         s_n = len(orig_idxs)
+        neighbor_watersheds = neighbor_watersheds_buf[:, :s_n]
         neighbors_masked(wa, wb, wc, saddle,
-                         out=neighbor_watersheds[:, :s_n].reshape((3, 3, -1)))
-        nodatamask = neighbor_watersheds == nodata
-        neighbor_watersheds[nodatamask] = 0
+                         out=neighbor_watersheds.reshape((3, 3, -1)))
+        neighbor_watersheds[neighbor_watersheds == nodata] = 0
         neighbor_watersheds.sort(axis=0)
-        diff = neighbor_watersheds[:-1, :s_n] != neighbor_watersheds[1:, :s_n]
+        diff = neighbor_watersheds[:-1] != neighbor_watersheds[1:]
         ts = np.repeat(True, s_n)
         diff = np.r_[ts.reshape((1, s_n)), diff]
         ndiff = diff.sum(axis=0)
