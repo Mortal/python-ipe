@@ -213,7 +213,7 @@ def degrees(elev, rank):
     n_rank += get_nodata_value(n_rank.dtype)
     cmps = np.zeros((3, 3, len(row)), dtype=np.float32)
     cmps2 = np.zeros((9, len(row)), dtype=np.bool)
-    cmp_same = np.zeros((8, len(row)), dtype=np.bool)
+    cmp_neq = np.zeros((8, len(row)), dtype=np.bool)
     cmp_diffs = np.zeros(len(row), dtype=np.uint8)
     elev_rank_buf = np.zeros((2, len(row)), dtype=np.bool)
     for (ae, be, ce), (ar, br, cr) in raster.window(elev, rank):
@@ -236,9 +236,9 @@ def degrees(elev, rank):
                 [0, 0, 0, 1, 2, 2, 2, 1, 0],
             ],
             out=cmps2)
-        np.equal(cmps2[:-1, :], cmps2[1:, :], out=cmp_same)
-        np.sum(~cmp_same, axis=0, out=cmp_diffs)
-        assert np.all(cmp_diffs % 2 == 0)
+        np.not_equal(cmps2[:-1, :], cmps2[1:, :], out=cmp_neq)
+        np.sum(cmp_neq, axis=0, out=cmp_diffs)
+        # assert np.all(cmp_diffs % 2 == 0)
         yield np.divide(cmp_diffs, 2, out=cmp_diffs)
 
 
