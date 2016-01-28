@@ -288,7 +288,6 @@ def negative_saddles(elev, rank, wsheds):
     ws_it = raster.window(wsheds)
     data = enumerate(zip(*list(map(add_nodata_row, (elev2, deg_it, ws_it)))))
     result = []
-    saddle = []
     neighbor_watersheds_buf = np.zeros((9, len(row)), dtype=row.dtype)
     saddle = np.zeros(len(row), dtype=np.bool)
     nodata = get_nodata_value(np.uint32)
@@ -306,6 +305,7 @@ def negative_saddles(elev, rank, wsheds):
         diff = np.r_[ts.reshape((1, s_n)), diff]
         ndiff = diff.sum(axis=0)
 
+        saddle_list = []
         for i in (ndiff > 1).nonzero()[0]:
             w = neighbor_watersheds[:, i][diff[:, i]].tolist()
             assert len(w) > 1
@@ -313,13 +313,13 @@ def negative_saddles(elev, rank, wsheds):
                 for k2 in range(k1 + 1, len(w)):
                     e = (w[k1], w[k2])
                     v = (z[orig_idxs[i]], j, orig_idxs[i])
-                    saddle.append((e, v))
-        if saddle:
-            saddle.sort()
+                    saddle_list.append((e, v))
+        if saddle_list:
+            saddle_list.sort()
             saddle2 = []
             searches = []
             res = [None]
-            for e, gr in groupby(saddle, key=lambda x: x[0]):
+            for e, gr in groupby(saddle_list, key=lambda x: x[0]):
                 searches.append(e)
                 res.append(min(gr))
             res = np.array(res, dtype=np.object)[1:]
@@ -330,7 +330,7 @@ def negative_saddles(elev, rank, wsheds):
             indices = np.searchsorted(active, searches)
             indices[indices == len(active)] = 0
             found = (active[indices] == searches).any(axis=1)
-            saddle = res[found].tolist()
+            saddle_list = res[found].tolist()
             i = len(result)
             result.extend(res[~found].tolist())
     return result
