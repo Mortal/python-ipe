@@ -72,23 +72,47 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
         return it()
 
 
-def write_raster(filename, f, dtype, meta):
+def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
     out_driver = gdal.GetDriverByName('GTiff')
-    gdal_dtype = gdal.GetDataTypeByName(dtype.__name__)
+    try:
+        dtype_name = dtype.name
+    except AttributeError:
+        dtype_name = dtype.__name__
+    gdal_dtype = gdal.GetDataTypeByName(dtype_name)
+    print(dtype_name)
+    print(type(get_nodata_value(dtype)), repr(get_nodata_value(dtype)))
+    print(gdal_dtype)
 
-    xsize = meta.RasterXSize
-    ysize = meta.RasterYSize
     nbands = 1
 
     assert xsize > 0
     assert ysize > 0
 
     ds = out_driver.Create(filename, xsize, ysize, nbands, gdal_dtype)
-    ds.SetGeoTransform(meta.GetGeoTransform())
-    ds.SetProjection(meta.GetProjection())
+    f_ds(ds)
     band = ds.GetRasterBand(1)
-    band.SetNoDataValue(get_nodata_value(dtype))
+    band.SetNoDataValue(np.float64(get_nodata_value(dtype)))
     f(band)
+
+
+def write_raster(filename, f, dtype, meta):
+    xsize = meta.RasterXSize
+    ysize = meta.RasterYSize
+    def f_ds(ds):
+        ds.SetGeoTransform(meta.GetGeoTransform())
+        ds.SetProjection(meta.GetProjection())
+
+    return write_raster_base(filename, dtype, f, f_ds, xsize, ysize)
+
+
+def write_generated_raster(filename, r):
+    def f_ds(ds):
+        pass
+
+    def f(band):
+        band.WriteArray(r)
+
+    write_raster_base(filename, r.dtype, f, f_ds, r.shape[1], r.shape[0])
 
 
 def raster_sink(filename, iterable, dtype, meta):
