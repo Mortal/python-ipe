@@ -112,6 +112,7 @@ def write_generated_raster(filename, r):
     def f(band):
         band.WriteArray(r)
 
+    r = np.asarray(r)
     write_raster_base(filename, r.dtype, f, f_ds, r.shape[1], r.shape[0])
 
 
