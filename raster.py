@@ -79,9 +79,6 @@ def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
     except AttributeError:
         dtype_name = dtype.__name__
     gdal_dtype = gdal.GetDataTypeByName(dtype_name)
-    print(dtype_name)
-    print(type(get_nodata_value(dtype)), repr(get_nodata_value(dtype)))
-    print(gdal_dtype)
 
     nbands = 1
 
