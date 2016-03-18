@@ -40,8 +40,22 @@ def main():
     args = parser.parse_args()
     keys = 'basin V A rec fwd parent z'.split()
     fmt = 'lddIIlfxxxx'
+    basin_format = '%7d'
+    float_format = '%22s'
+    display_format = {
+        'basin': basin_format,
+        'rec': basin_format,
+        'fwd': basin_format,
+        'parent': basin_format,
+        'V': float_format,
+        'z': float_format,
+        'A': '%6.0f.0',
+    }
+
     for v in iterstructs(args.filename, fmt):
-        print(json.dumps(collections.OrderedDict(zip(keys, v)), sys.stdout))
+        print("{%s}" %
+              ', '.join('"%s": %s' % (k, display_format[k] % (a,))
+                        for k, a in zip(keys, v)))
 
 
 if __name__ == "__main__":
