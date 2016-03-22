@@ -16,6 +16,7 @@ def main():
         if not PY2:
             print("This is a Python 2 script. Rerunning with Python 2.")
             os.execlp('python2', 'python2', *sys.argv)
+        raise
     parser = argparse.ArgumentParser()
     parser.add_argument('filename')
     args = parser.parse_args()
