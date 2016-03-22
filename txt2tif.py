@@ -1,3 +1,16 @@
+"""
+Convert ASCII grid to GeoTIFF.
+
+Each line in the input file becomes a corresponding row,
+and the number of columns in the output raster is taken to be
+the length of the longest line.
+
+Lines must consist of digits 0-9 and spaces.
+Digits are converted to integer heights.
+
+If you want floating-point heights, you can use TerraSTREAM's Utility-convert,
+parameters --output bla.txt --output-type gdal --output-gdal-driver AAIGrid
+"""
 import os
 import sys
 import argparse
