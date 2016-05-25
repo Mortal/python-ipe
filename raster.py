@@ -154,6 +154,10 @@ def get_nodata_value(dtype):
         return np.finfo(dtype).min
 
 
+def is_nodata(v):
+    return v == get_nodata_value(v.dtype)
+
+
 def nodata_like(row):
     row = np.asarray(row)
     return np.zeros_like(row) + get_nodata_value(row.dtype)
