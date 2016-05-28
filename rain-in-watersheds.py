@@ -9,23 +9,39 @@ from itertools import izip as zip
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-heights', required=True,
-                        help='Water heights')
+    parser.add_argument('--input-elev', required=True,
+                        help='Elevation model')
+    parser.add_argument('--input-depths', required=True,
+                        help='Water depths')
     parser.add_argument('--input-watersheds', required=True,
                         help='Watersheds')
     args = parser.parse_args()
 
-    heights = raster.iterrows(args.input_heights)
+    elev = raster.iterrows(args.input_elev, pi=raster.dummy_progress)
+    depths = raster.iterrows(args.input_depths, pi=raster.dummy_progress)
     watersheds = raster.iterrows(args.input_watersheds)
     active0 = {}
     active1 = {}
-    for h_row, w_row in zip(heights, watersheds):
+    min_welev = {}
+    max_welev = {}
+    total_rain = 0
+    for i, (z_row, d_row, w_row) in enumerate(zip(elev, depths, watersheds)):
         acc0 = collections.defaultdict(int)
         acc1 = collections.defaultdict(np.float32)
-        for h, w in zip(h_row, w_row):
-            if not raster.is_nodata(w):
+        for j, (z, d, w) in enumerate(zip(z_row, d_row, w_row)):
+            if raster.is_nodata(w):
+                if d != 0 and not raster.is_nodata(d):
+                    print("Row %s column %s: water depth %s" %
+                          (i, j, d))
+            else:
+                if raster.is_nodata(d):
+                    d = 0
+                else:
+                    welev = z + d
+                    min_welev[w] = min(min_welev.get(w, welev), welev)
+                    max_welev[w] = max(max_welev.get(w, welev), welev)
                 acc0[w] += 1
-                acc1[w] += 0 if raster.is_nodata(h) else h
+                acc1[w] += d
         res0 = []
         res1 = []
         for k, v0 in acc0.items():
@@ -33,15 +49,20 @@ def main():
             res0.append((k, v0 + active0.pop(k, 0)))
             res1.append((k, v1 + active1.pop(k, 0)))
         for k, v0 in active0.items():
-            v1 = active1[k]
-            print('{"watershed": %s, "area": %s, "total_rain": %s}' %
-                  (k, v0, v1))
+            if k != 0:
+                print(('{"watershed": %s, "area": %s, "total_rain": %s, ' +
+                       '"min": %s, "max": %s}') %
+                      (k, v0, active1.pop(k), min_welev.pop(k),
+                       max_welev.pop(k)))
+            total_rain += v1
         active0 = dict(res0)
         active1 = dict(res1)
     for k, v0 in active0.items():
         v1 = active1[k]
         print('{"watershed": %s, "area": %s, "total_rain": %s}' %
               (k, v0, v1))
+        total_rain += v1
+    print('{"total_rain": %s}' % total_rain)
 
 
 if __name__ == "__main__":
