@@ -31,15 +31,19 @@ def main():
             os.execlp('python2', 'python2', *sys.argv)
         raise
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename')
+    parser.add_argument('filename', nargs='+')
     args = parser.parse_args()
+    for f in [convert(raster, f) for f in args.filename]:
+        f()
 
-    base, ext = os.path.splitext(args.filename)
+
+def convert(raster, filename):
+    base, ext = os.path.splitext(filename)
     if ext == '.tif':
         parser.error("Input and output filenames are equal")
     output_filename = base + '.tif'
 
-    with open(args.filename) as fp:
+    with open(filename) as fp:
         terrain = fp.read().strip('\n').splitlines()
 
     nrows = len(terrain)
@@ -53,8 +57,11 @@ def main():
             if cell != ' ':
                 r[i, j] = float(cell)
 
-    print("Writing raster of shape %s to %s" % (r.shape, output_filename))
-    raster.write_generated_raster(output_filename, r)
+    def defer():
+        print("Writing raster of shape %s to %s" % (r.shape, output_filename))
+        raster.write_generated_raster(output_filename, r)
+
+    return defer
 
 
 if __name__ == "__main__":
