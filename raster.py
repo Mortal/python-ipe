@@ -25,9 +25,9 @@ def show_progress(name=""):
             t[1] = time.time()
             t[2] = i / (t[1] - t[0])
             t[3] = i + every
-        sys.stdout.write("%3d%% %s %12d/%d %g\r" %
+        sys.stderr.write("%3d%% %s %12d/%d %g\r" %
                          (i * 100 / n, name, i, n, t[2]))
-        sys.stdout.flush()
+        sys.stderr.flush()
         if i == n:
             print('')
 
