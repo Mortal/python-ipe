@@ -55,8 +55,8 @@ def main():
             if k != 0:
                 print(('{"watershed": %s, "area": %s, "total_rain": %s, ' +
                        '"min": %s, "max": %s}') %
-                      (k, v0, active1.pop(k), min_welev.pop(k),
-                       max_welev.pop(k)))
+                      (k, v0, active1.pop(k), min_welev.pop(k, None),
+                       max_welev.pop(k, None)))
             total_rain += v1
         active0 = dict(res0)
         active1 = dict(res1)
