@@ -27,9 +27,9 @@ def show_progress(name=""):
             t[3] = i + every
         sys.stderr.write("%3d%% %s %12d/%d %g\r" %
                          (i * 100 / n, name, i, n, t[2]))
-        sys.stderr.flush()
         if i == n:
-            print('')
+            sys.stderr.write('\n')
+        sys.stderr.flush()
 
     return pi
 
@@ -65,6 +65,7 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
                 if p > progress or i + 1 == nrows:
                     progress = p
                     pi(i + 1, nrows)
+        pi(nrows, nrows)
 
     if meta:
         return ds, it()
