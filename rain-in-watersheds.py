@@ -28,13 +28,16 @@ def main():
     for i, (z_row, d_row, w_row) in enumerate(zip(elev, depths, watersheds)):
         acc0 = collections.defaultdict(int)
         acc1 = collections.defaultdict(np.float32)
-        for j, (z, d, w) in enumerate(zip(z_row, d_row, w_row)):
-            if raster.is_nodata(w):
-                if d != 0 and not raster.is_nodata(d):
+        rowzip = zip(z_row.tolist(), d_row.tolist(), w_row.tolist())
+        w_nodata = raster.get_nodata_value(w_row.dtype)
+        d_nodata = raster.get_nodata_value(d_row.dtype)
+        for j, (z, d, w) in enumerate(rowzip):
+            if w == w_nodata:
+                if d != 0 and d != d_nodata:
                     print("Row %s column %s: water depth %s" %
                           (i, j, d))
             else:
-                if raster.is_nodata(d):
+                if d == d_nodata:
                     d = 0
                 else:
                     welev = z + d
