@@ -79,15 +79,15 @@ def main():
                     print("%s and %s: File 2 disagrees: %s - %s = %s" %
                           (a, i, depths[a][1], depths[i][1], d2),
                           file=sys.stderr)
-            d = depths[a][0] - depths[a][1]
             r1 = depths[a][2]
             r2 = depths[a][3]
+            d = r1 - r2
             area = depths[a][4]
             if tr is None:
                 r = '%5s:%5s' % (a, b)
             else:
                 r = ','.join(str(tr.get(i, '[%s]' % i)) for i in range(a, b+1))
-            print("%10.7f %s %s V=%s A=%s basinVolume=%s ar=%s br=%s az=%s bz=%s" %
+            print("%g %s %s V=%s A=%s basinVolume=%s ar=%s br=%s az=%s bz=%s" %
                   (d, r, mo.group(3), mo.group(4), area, mo.group(5),
                    r1, r2, depths[a][0], depths[a][1]))
 
