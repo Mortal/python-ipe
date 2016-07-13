@@ -31,7 +31,7 @@ def getflat(arr, idx):
 @njit
 def compute_subtree_size(items, parent):
     subtree_size = np.zeros(items, dtype=np.uint32)
-    for i in range(len(subtree_size)):
+    for i in range(items):
         subtree_size[i] += 1
         if getflat(parent, i) != 0:
             subtree_size[getflat(parent, i) - 1] += subtree_size[i]
@@ -48,9 +48,10 @@ def partition(x, v):
     return left_size
 
 
-@njit
-def count_signals(items, basin, parent, rec, fwd):
-    nblocks, blockitems = basin.shape
+@njit('(int64, Array(int64, 2, "A", readonly=True), \
+        Array(uint32, 2, "A", readonly=True))')
+def count_signals(items, parent, fwd):
+    nblocks, blockitems = parent.shape
     roots = 0
 
     subtree_size = compute_subtree_size(items, parent)
@@ -143,8 +144,7 @@ def main():
     blockitems, blockpadding = divmod(BS, dt.itemsize)
     items = np.ndarray((nblocks, blockitems), buffer=data.data, dtype=dt,
                        strides=(BS, dt.itemsize))
-    print(count_signals(header['size'], items['basin'], items['parent'],
-                        items['rec'], items['fwd']))
+    print(count_signals(header['size'], items['parent'], items['fwd']))
 
 
 if __name__ == "__main__":
