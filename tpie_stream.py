@@ -57,10 +57,49 @@ def iteritems(filename, item_size):
             yield block[i:j]
 
 
+class float32(object):
+    """
+    >>> str(float32(1.659999966621399))
+    '1.66'
+    >>> float32(1.659999966621399)
+    float32(1.66)
+    """
+
+    def __init__(self, v):
+        self.v = v
+
+    def __str__(self):
+        # At least 6 (digits10) but not 9 (max_digits10)
+        return '%.6g' % (self.v,)
+
+    def __repr__(self):
+        return 'float32(%s)' % (self,)
+
+    def dumps(self):
+        return str(self)
+
+
+def unpack(fmt, s, item):
+    r = []
+    for f, o in zip(fmt, s.unpack(item)):
+        if f == 'f':
+            r.append(float32(o))
+        else:
+            r.append(o)
+    return tuple(r)
+
+
 def iterstructs(filename, fmt):
     s = struct.Struct(fmt)
     for item in iteritems(filename, s.size):
-        yield s.unpack(item)
+        yield unpack(fmt, s, item)
+
+
+def dumps(v):
+    try:
+        return v.dumps()
+    except AttributeError:
+        return json.dumps(v)
 
 
 def main():
@@ -70,7 +109,8 @@ def main():
     args = parser.parse_args()
     keys, fmt = FORMATS[args.format]
     for v in iterstructs(args.filename, fmt):
-        print(json.dumps(collections.OrderedDict(zip(keys, v)), sys.stdout))
+        o = collections.OrderedDict(zip(keys, v))
+        print('{%s}' % ', '.join('%s: %s' % (json.dumps(k), dumps(v)) for k, v in o.items()))
 
 
 if __name__ == "__main__":
