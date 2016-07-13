@@ -5,10 +5,13 @@ import sys
 import gdal
 import time
 
-from itertools import izip as zip
 from itertools import chain
 
 import numpy as np
+
+PY2 = sys.hexversion < 0x03000000
+if PY2:
+    from itertools import izip as zip  # noqa
 
 
 gdal.UseExceptions()
