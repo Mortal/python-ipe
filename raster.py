@@ -147,7 +147,6 @@ def points_to_raster(filename, iterable, dtype, meta):
     return raster_sink(filename, f(), dtype, meta)
 
 
-
 def load(filename, pi=None):
     ds = gdal.Open(filename)
     band = ds.GetRasterBand(1)
