@@ -1,32 +1,123 @@
+import time
 import struct
 import argparse
 import collections
 import numpy as np
 
-from numba import jit
+from numba import jit, njit
 
-from tpie_stream import FORMATS
-
-
-def parse_header(b):
-    header_keys = (
-        'magic version item_size block_size user_data_size ' +
-        'max_user_data_size size flags last_block_read_offset').split()
-    header_fmt = struct.Struct(len(header_keys) * 'L')
-    header_dict = collections.OrderedDict(
-        zip(header_keys, header_fmt.unpack(b[:header_fmt.size].tostring())))
-    return header_dict
+from tpie_stream import parse_header
 
 
-@jit(nopython=True)
-def foo(items, basin, parent, rec, fwd):
+FORMATS = {
+    'merge-tree': (
+        'basin V A rec fwd parent z'.split(),
+        'lddIIlfxxxx',
+    ),
+    'merge-tree-2': (
+        'basin V A rec fwd parent i j z r'.split(),
+        'lddIIliifI',
+    ),
+}
+
+
+@njit
+def getflat(arr, idx):
+    n, m = arr.shape
+    i, j = idx // m, idx % m
+    return arr[i, j]
+
+
+@njit
+def compute_subtree_size(items, parent):
+    subtree_size = np.zeros(items, dtype=np.uint32)
+    for i in range(len(subtree_size)):
+        subtree_size[i] += 1
+        if getflat(parent, i) != 0:
+            subtree_size[getflat(parent, i) - 1] += subtree_size[i]
+    return subtree_size
+
+
+@njit
+def partition(x, v):
+    left_size = 0
+    for i in range(len(x)):
+        if x[i] < v:
+            x[left_size], x[i] = x[i], x[left_size]
+            left_size += 1
+    return left_size
+
+
+@njit
+def count_signals(items, basin, parent, rec, fwd):
     nblocks, blockitems = basin.shape
     roots = 0
-    for k in range(items):
+
+    subtree_size = compute_subtree_size(items, parent)
+
+    signals = np.zeros(items, dtype=np.uint32)
+    stack_size = np.zeros(items, dtype=np.uint32)
+    stack_owner = np.zeros(items, dtype=np.uint32)
+    tos = 0
+
+    signal_count = 0
+
+    for k in range(items - 1, -1, -1):
         i, j = k // blockitems, k % blockitems
+        # print(k, parent[i, j])
+
+        if parent[i, j] > 0:
+            while tos > 0 and stack_owner[tos] != parent[i, j]:
+                # The top of stack was from a node that has no more
+                # children, so it should be empty.
+                if stack_size[tos-1] != stack_size[tos]:
+                    raise Exception("Unhandled signals on top of stack")
+                tos -= 1
+            # Our parent has forwarded a list to us on the stack.
+            if tos == 0:
+                raise Exception("Parent did not forward a list of signals")
+
+        # Push empty stack
+        tos += 1
+        stack_size[tos] = stack_size[tos-1]
+        stack_owner[tos] = k+1
+
         if parent[i, j] == 0:
             roots += 1
-    return roots
+        else:
+            # Partition parent list into ours and not ours
+            min_leaf = k - subtree_size[k] + 1
+            not_ours = partition(
+                signals[stack_size[tos-2]:stack_size[tos]], min_leaf)
+            stack_size[tos-1] = stack_size[tos-2] + not_ours
+
+        signal_count += stack_size[tos] - stack_size[tos-1]
+        if fwd[i, j] == k+1:
+            if subtree_size[k] != 1:
+                raise Exception("Leaf, but subtree size is not 1")
+            # Leaf
+            for s in signals[stack_size[tos-1]:stack_size[tos]]:
+                if s != k:
+                    raise Exception("Signal for leaf not to leaf")
+            tos -= 1
+        else:
+            if subtree_size[k] == 1:
+                raise Exception("Non-leaf, but subtree size is 1")
+            signals[stack_size[tos]] = fwd[i, j] - 1
+            stack_size[tos] += 1
+
+    return signal_count
+
+
+@njit
+def count_nonroots(parent):
+    nblocks, blockitems = parent.shape
+    nparents = 0
+    for i in range(nblocks):
+        for j in range(blockitems):
+            if parent[i, j] != 0:
+                nparents += 1
+    return nparents
 
 
 def main():
@@ -44,7 +135,7 @@ def main():
     dt = np.dtype(dt)
 
     fp = np.memmap(args.filename, mode='r')
-    header = parse_header(fp)
+    header = parse_header(fp[:4096].tostring())
     data = fp[4096:]
     BS = 2**21
     nblocks, remaining = divmod(len(data), BS)
@@ -52,8 +143,8 @@ def main():
     blockitems, blockpadding = divmod(BS, dt.itemsize)
     items = np.ndarray((nblocks, blockitems), buffer=data.data, dtype=dt,
                        strides=(BS, dt.itemsize))
-    print(foo(header['size'], items['basin'], items['parent'],
-              items['rec'], items['fwd']))
+    print(count_signals(header['size'], items['basin'], items['parent'],
+                        items['rec'], items['fwd']))
 
 
 if __name__ == "__main__":
