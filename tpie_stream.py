@@ -28,15 +28,20 @@ FORMATS = {
 }
 
 
+def parse_header(b):
+    header_keys = (
+        'magic version item_size block_size user_data_size ' +
+        'max_user_data_size size flags last_block_read_offset').split()
+    header_fmt = struct.Struct(len(header_keys) * 'L')
+    header_dict = collections.OrderedDict(
+        zip(header_keys, header_fmt.unpack(b[:header_fmt.size])))
+    return header_dict
+
+
 def iterblocks(filename, item_size):
     with open(filename, 'rb') as fp:
         header = fp.read(4096)
-        header_keys = (
-            'magic version item_size block_size user_data_size ' +
-            'max_user_data_size size flags last_block_read_offset').split()
-        header_fmt = struct.Struct(len(header_keys) * 'L')
-        header_dict = collections.OrderedDict(
-            zip(header_keys, header_fmt.unpack(header[:header_fmt.size])))
+        header_dict = parse_header(header)
         print(json.dumps(header_dict))
         if item_size != header_dict['item_size']:
             raise ValueError(
