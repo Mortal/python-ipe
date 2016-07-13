@@ -28,14 +28,20 @@ FORMATS = {
 }
 
 
-def iterblocks(filename):
+def iterblocks(filename, item_size):
     with open(filename, 'rb') as fp:
         header = fp.read(4096)
         header_keys = (
             'magic version item_size block_size user_data_size ' +
             'max_user_data_size size flags last_block_read_offset').split()
         header_fmt = struct.Struct(len(header_keys) * 'L')
-        print(json.dumps(collections.OrderedDict(zip(header_keys, header_fmt.unpack(header[:header_fmt.size])))))
+        header_dict = collections.OrderedDict(
+            zip(header_keys, header_fmt.unpack(header[:header_fmt.size])))
+        print(json.dumps(header_dict))
+        if item_size != header_dict['item_size']:
+            raise ValueError(
+                "Item size mismatch: Header says %s, expected %s" %
+                (header_dict['item_size'], item_size))
         while True:
             block = fp.read(2048*1024)
             if not block:
@@ -45,7 +51,7 @@ def iterblocks(filename):
 
 def iteritems(filename, item_size):
     print(item_size)
-    for block in iterblocks(filename):
+    for block in iterblocks(filename, item_size):
         for i in range(0, len(block) - item_size + 1, item_size):
             j = i + item_size
             yield block[i:j]
