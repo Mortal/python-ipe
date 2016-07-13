@@ -39,6 +39,19 @@ def compute_subtree_size(items, parent):
 
 
 @njit
+def count_leaves(fwd):
+    nblocks, blockitems = fwd.shape
+    k = 0
+    nleaves = 0
+    for i in range(nblocks):
+        for j in range(blockitems):
+            k += 1
+            if fwd[i, j] == k:
+                nleaves += 1
+    return nleaves
+
+
+@njit
 def partition(x, v):
     left_size = 0
     for i in range(len(x)):
@@ -135,16 +148,46 @@ def main():
         dt.append(('_padding', 'V%s' % padding))
     dt = np.dtype(dt)
 
+    header_area_size = 4096
+
+    with open(args.filename, 'r+b') as fp:
+        header_area = fp.read(header_area_size)
+        header = parse_header(header_area)
+        basin_count = header['size']
+        block_size = header['block_size']
+        assert block_size == 2**21
+        assert header['item_size'] == dt.itemsize
+        assert header['max_user_data_size'] <= 8
+        block_items, block_padding = divmod(block_size, dt.itemsize)
+        nblocks, last_block_size = divmod(basin_count, block_items)
+        if last_block_size > 0:
+            nblocks += 1
+        expected_size = nblocks * block_size
+        fp.seek(0, 2)  # seek to end
+        actual_size = fp.tell()
+        if actual_size < expected_size:
+            padding = expected_size - actual_size
+            print("Extending %s with %s zero bytes" %
+                  (args.filename, padding))
+            assert padding < block_size
+            fp.write(b'\x00' * padding)
+
     fp = np.memmap(args.filename, mode='r')
-    header = parse_header(fp[:4096].tostring())
-    data = fp[4096:]
-    BS = 2**21
-    nblocks, remaining = divmod(len(data), BS)
-    assert remaining == 0
-    blockitems, blockpadding = divmod(BS, dt.itemsize)
-    items = np.ndarray((nblocks, blockitems), buffer=data.data, dtype=dt,
-                       strides=(BS, dt.itemsize))
-    print(count_signals(header['size'], items['parent'], items['fwd']))
+    data = fp[header_area_size:]
+    merge_tree = np.ndarray(
+        (nblocks, block_items), buffer=data.data, dtype=dt,
+        strides=(block_size, dt.itemsize))
+    basin_count = header['size']
+    print("Number of basins: %s" % basin_count)
+    parent = merge_tree['parent']
+    forwarder = merge_tree['fwd']
+    sinks = count_leaves(forwarder)
+    print("Number of sinks: %s" % sinks)
+    saddles = basin_count - sinks
+    print("Number of internal nodes: %s" % saddles)
+    trickle_path_edges = count_signals(basin_count, parent, forwarder)
+    print("Number of trickle path edges: %s" % trickle_path_edges)
+    print("On average %.2f edges per saddle" % (trickle_path_edges / saddles))
 
 
 if __name__ == "__main__":
