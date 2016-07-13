@@ -113,9 +113,15 @@ def main():
     parser.add_argument('filename')
     args = parser.parse_args()
     keys, fmt = FORMATS[args.format]
-    for v in iterstructs(args.filename, fmt):
-        o = collections.OrderedDict(zip(keys, v))
-        print('{%s}' % ', '.join('%s: %s' % (json.dumps(k), dumps(v)) for k, v in o.items()))
+    try:
+        for v in iterstructs(args.filename, fmt):
+            o = collections.OrderedDict(zip(keys, v))
+            print('{%s}' % ', '.join('%s: %s' % (json.dumps(k), dumps(v))
+                                     for k, v in o.items()))
+    except BrokenPipeError:
+        pass
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
