@@ -169,6 +169,10 @@ def nodata_like(row):
     return np.zeros_like(row) + get_nodata_value(row.dtype)
 
 
+def empty(shape, dtype):
+    return np.zeros(shape, dtype=dtype) + get_nodata_value(dtype)
+
+
 def window_single(iterable):
     try:
         row = next(iterable)
