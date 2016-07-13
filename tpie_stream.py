@@ -5,6 +5,13 @@ import argparse
 import collections
 
 
+PY2 = sys.hexversion <= 0x03000000
+
+
+if PY2:
+    from itertools import izip as zip
+
+
 FORMATS = {
     'merge-tree': (
         'basin V A rec fwd parent z'.split(),
