@@ -106,9 +106,12 @@ def write_raster(filename, f, dtype, meta):
     return write_raster_base(filename, dtype, f, f_ds, xsize, ysize)
 
 
-def write_generated_raster(filename, r):
+def write_generated_raster(filename, r, projection=None, geo_transform=None):
     def f_ds(ds):
-        pass
+        if projection is not None:
+            ds.SetProjection(projection)
+        if geo_transform is not None:
+            ds.SetGeoTransform(geo_transform)
 
     def f(band):
         band.WriteArray(r)
