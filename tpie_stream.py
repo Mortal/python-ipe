@@ -17,6 +17,10 @@ FORMATS = {
         'basin V A rec fwd parent z'.split(),
         'lddIIlfxxxx',
     ),
+    'merge-tree-2': (
+        'basin V A rec fwd parent i j z r'.split(),
+        'lddIIliifI',
+    ),
     'dfs-merge-tree': (
         'basin parent V z rec1 rec2 split'.split(),
         'IIffIII',
