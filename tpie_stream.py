@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+'''
+Utility to convert data in TPIE streams into JSON objects.
+'''
+
 import sys
 import json
 import struct
