@@ -1,3 +1,10 @@
+'''
+Raster reading/writing utilities.
+
+Supports automatic progress indication when reading with iterrows;
+pass pi=raster.dummy_progress to disable.
+'''
+
 from __future__ import division
 
 import os
