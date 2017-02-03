@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+'''
+Use raster.py write_generated_raster to make a small raster for testing.
+'''
+
 import textwrap
 
 import numpy as np
