@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+'''
+Given two watershed rasters for the same terrain,
+find out which watershed IDs correspond to each other.
+'''
+
 from __future__ import division
 
 import numpy as np
