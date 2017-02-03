@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+'''
+Program to clip out the smallest rectangle of a raster
+containing cells in particular watersheds.
+
+Uses iterrows/write_generated_raster of raster.py to read/write the rasters.
+
+The input is a data raster, a watershed raster, and a set of watershed ids.
+The boundary parameter (default 1) indicates how many extra adjacent
+rows/columns should be included.
+'''
 import argparse
 from itertools import izip as zip
 
@@ -7,6 +18,17 @@ import raster
 
 
 def input_range(s):
+    '''
+    Parse comma-separated range list, e.g.:
+
+    >>> sorted(input_range('1,2,4,10:13'))
+    [1, 2, 4, 10, 11, 12]
+
+    If a single range is given, it is returned as a range object:
+
+    >>> input_range('5:9')
+    range(5, 9)
+    '''
     parts = s.split(',')
     result = []
     for p in parts:
@@ -33,6 +55,7 @@ def main():
 
     boundary = args.boundary
 
+    # Optimization: If data raster is the watershed raster, read it only once
     if args.input_watersheds == args.input_target:
         r = raster.iterrows(args.input_watersheds)
         rows = ((row, row) for row in r)
@@ -65,6 +88,7 @@ def main():
 
     if not output_rows:
         raise SystemExit("%s not found" % (needle,))
+    # Find leftmost and rightmost output column
     i = min(x[0] for x in output_rows)
     j = max(x[1] for x in output_rows)
     print("Write %dx%d raster" % (len(output_rows), j - i))
