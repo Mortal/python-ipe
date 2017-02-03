@@ -1,3 +1,9 @@
+'''
+Compute the largest number of distinct watersheds in a row
+as well as the size (number of cells) of each watershed.
+
+Uses raster.py iterrows to read the watersheds raster.
+'''
 from __future__ import division
 
 import numpy as np
