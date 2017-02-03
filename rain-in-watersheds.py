@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+'''
+Combine elevation raster, water depth raster and watersheds raster
+into a list of water elevations by adding the terrain elevation to
+the water depth in each watershed. Also computes the total amount of
+rain (i.e. the sum of the water depth raster values).
+
+Uses iterrows from raster.py to read the three input rasters.
+Output is as JSON objects, one per output line.
+'''
+
 from __future__ import division
 
 import numpy as np
