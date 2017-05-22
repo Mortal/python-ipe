@@ -25,18 +25,25 @@ gdal.UseExceptions()
 
 
 def show_progress(name=""):
-    t = [0, 0, 0, 0]
-    every = 100
+    # start time, current time, step per time, next update step, steps per display, next display step
+    t = [0, 0, 0, 0, 1, 0]
+    recalc_every = 100
+    update_every = 0.1
     def pi(i, n):
+        if i < t[5]:
+            return
         if t[0] == 0:
             t[0] = time.time()
-            t[3] = i + every
+            t[3] = i + recalc_every
         elif i >= t[3]:
             t[1] = time.time()
             t[2] = i / (t[1] - t[0])
-            t[3] = i + every
-        sys.stderr.write("%3d%% %s %12d/%d %g\r" %
-                         (i * 100 / n, name, i, n, t[2]))
+            t[3] = i + recalc_every
+            t[4] = int(update_every * t[2])
+        t[5] = min(n, i + t[4])
+        sys.stderr.write("%3d%% %s %12d/%d %g %.2f\r" %
+                         (i * 100 / n, name, i, n, t[2],
+                          t[2] and (n - i) / t[2]))
         if i == n:
             sys.stderr.write('\n')
         sys.stderr.flush()
