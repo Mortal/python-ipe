@@ -60,7 +60,7 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
         pi = show_progress(os.path.basename(filename))
     ds = gdal.Open(filename)
 
-    def it():
+    def it(ds):
         # xsize = ds.RasterXSize
         nrows = ds.RasterYSize
         band = ds.GetRasterBand(1)
@@ -79,15 +79,18 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
                 band.ReadAsArray(0, src_row, win_ysize=1, buf_obj=row[k:k+1])
                 yield row[k]
                 p = (i + 1) * 1000 // nrows
-                if p > progress or i + 1 == nrows:
+                if p > progress and i + 1 < nrows:
                     progress = p
                     pi(i + 1, nrows)
         pi(nrows, nrows)
+        # Without this del we get
+        # "SystemError: <built-in function delete_Dataset> returned a result with an error set"
+        del ds
 
     if meta:
-        return ds, it()
+        return ds, it(ds)
     else:
-        return it()
+        return it(ds)
 
 
 def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
