@@ -24,7 +24,7 @@ if PY2:
 gdal.UseExceptions()
 
 
-def show_progress(name=""):
+def show_progress(name="", more_steps=1):
     # start time, current time, step per time, next update step, steps per display, next display step
     t = [0, 0, 0, 0, 1, 0]
     recalc_every = 100
@@ -41,7 +41,7 @@ def show_progress(name=""):
             t[3] = i + recalc_every
             t[4] = int(update_every * t[2])
         t[5] = min(n, i + t[4])
-        output_time = ((t[2] and (n - i) / t[2])
+        output_time = ((t[2] and (more_steps * n - i) / t[2])
                        if i < n else time.time() - t[0])
         output_speed = '%g' % t[2]
         sys.stderr.write("\r\x1B[K%3d%% %s %12d/%d %-7s %.2f" %
