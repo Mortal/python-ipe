@@ -1,8 +1,5 @@
 '''
-Raster reading/writing utilities.
-
-Supports automatic progress indication when reading with iterrows;
-pass pi=raster.dummy_progress to disable.
+Helper functions for pygdal for easy row-by-row iteration of rasters.
 '''
 
 from __future__ import division
@@ -19,6 +16,22 @@ import numpy as np
 PY2 = sys.hexversion < 0x03000000
 if PY2:
     from itertools import izip as zip  # noqa
+
+
+DESCRIPTION = '''\
+Helper functions for pygdal for easy row-by-row iteration of rasters.
+
+Simple usage::
+
+    from raster import iterrows
+    for row in iterrows('georaster.tif'):
+        print(row.mean())  # row is a NumPy array
+
+Supports automatic progress indication when reading with iterrows;
+pass pi=raster.dummy_progress to disable.
+
+Read the source code for more information.\
+'''
 
 
 gdal.UseExceptions()
