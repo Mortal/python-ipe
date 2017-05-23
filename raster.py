@@ -109,10 +109,15 @@ def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
     assert ysize > 0
 
     ds = out_driver.Create(filename, xsize, ysize, nbands, gdal_dtype)
-    f_ds(ds)
-    band = ds.GetRasterBand(1)
-    band.SetNoDataValue(np.float64(get_nodata_value(dtype)))
-    f(band)
+    try:
+        f_ds(ds)
+        band = ds.GetRasterBand(1)
+        band.SetNoDataValue(np.float64(get_nodata_value(dtype)))
+        f(band)
+    except KeyboardInterrupt:
+        print("Removing %r" % (filename,))
+        os.remove(filename)
+        raise
 
 
 def write_raster(filename, f, dtype, meta):
