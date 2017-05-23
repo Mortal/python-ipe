@@ -41,9 +41,11 @@ def show_progress(name=""):
             t[3] = i + recalc_every
             t[4] = int(update_every * t[2])
         t[5] = min(n, i + t[4])
-        sys.stderr.write("%3d%% %s %12d/%d %g %.2f\r" %
-                         (i * 100 / n, name, i, n, t[2],
-                          t[2] and (n - i) / t[2]))
+        output_time = ((t[2] and (n - i) / t[2])
+                       if i < n else time.time() - t[0])
+        output_speed = '%g' % t[2]
+        sys.stderr.write("\r\x1B[K%3d%% %s %12d/%d %-7s %.2f" %
+                         (i * 100 / n, name, i, n, output_speed, output_time))
         if i == n:
             sys.stderr.write('\n')
         sys.stderr.flush()
