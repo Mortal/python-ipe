@@ -75,6 +75,8 @@ def main():
             parser.error("Expression must return a dict, not %s" %
                          (type(result).__name__,))
         for k, v in result.items():
+            if len(k) > 11:
+                parser.error('Field name must be at most 11 characters: %r' % (k,))
             if isinstance(v, float):
                 field_definition = Field(k, 'F', 25, 10)
             elif isinstance(v, int):
