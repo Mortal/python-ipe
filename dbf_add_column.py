@@ -101,7 +101,8 @@ def main():
         for k, v in e.items():
             output_record[field_index[k]] = v
         output_records.append(output_record)
-    t = '.~%s' % args.filename
+    t = os.path.join(os.path.dirname(args.filename),
+                     '.~%s' % os.path.basename(args.filename))
     write_dbf(t, output_fields, output_records)
     if not os.path.exists(backup_name) or args.clobber:
         os.rename(args.filename, backup_name)
