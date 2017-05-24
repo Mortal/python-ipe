@@ -12,12 +12,15 @@ setup(
     long_description=DESCRIPTION,
     author='https://github.com/Mortal',
     url='https://github.com/Mortal/pygdal-raster',
-    py_modules=['raster'],
+    py_modules=['raster', 'dbf_add_column'],
     include_package_data=True,
     license='GPLv3',
-    # entry_points={
-    #     'console_scripts': ['pygdal-raster = raster:main'],
-    # },
+    entry_points={
+        'console_scripts': [
+            # 'pygdal-raster = raster:main',
+            'dbf-add = dbf_add_column:main',
+        ],
+    },
     classifiers=[
         'License :: OSI Approved :: GNU General Public License (GPL)',
         'Intended Audience :: Developers',
