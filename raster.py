@@ -108,8 +108,21 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
         return it(ds)
 
 
+def iteroptions(driver, dtype, compress=True):
+    assert driver == 'GTiff'
+    yield ('BIGTIFF', 'IF_SAFER')
+    if dtype == np.bool:
+        yield ('NBITS', '1')
+    # if dtype == tribool:
+    #     yield ('NBITS', '2')
+    yield ('SPARSE_OK', 'TRUE')
+    if compress:
+        yield ('COMPRESS', 'DEFLATE')
+
+
 def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
-    out_driver = gdal.GetDriverByName('GTiff')
+    driver_name = 'GTiff'
+    out_driver = gdal.GetDriverByName(driver_name)
     try:
         dtype_name = dtype.name
     except AttributeError:
@@ -121,7 +134,9 @@ def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
     assert xsize > 0
     assert ysize > 0
 
-    ds = out_driver.Create(filename, xsize, ysize, nbands, gdal_dtype)
+    options = ['%s=%s' % kv for kv in iteroptions(driver_name, dtype)]
+
+    ds = out_driver.Create(filename, xsize, ysize, nbands, gdal_dtype, options)
     try:
         f_ds(ds)
         band = ds.GetRasterBand(1)
