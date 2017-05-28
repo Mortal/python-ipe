@@ -30,8 +30,8 @@ Simple usage::
 Supports automatic progress indication when reading with iterrows;
 pass pi=raster.dummy_progress to disable.
 
-Read the source code for more information.\
-'''
+Read the source code for more information.
+'''.rstrip()
 
 
 gdal.UseExceptions()
