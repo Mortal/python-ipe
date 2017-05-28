@@ -18,6 +18,7 @@ if PY2:
 
 
 FORMATS = {
+    'header': None,
     'merge-tree': (
         'basin V A rec fwd parent z'.split(),
         'lddIIlfxxxx',
@@ -29,6 +30,10 @@ FORMATS = {
     'dfs-merge-tree': (
         'basin parent V z rec1 rec2 split'.split(),
         'IIffIII',
+    ),
+    'semi-internal-merge-tree': (
+        'parent i j z r measure fwd rec containsGlobalSink'.split(),
+        'IIIfIxxxxdII?xxxxxxx',
     ),
 }
 
@@ -117,6 +122,13 @@ def main():
     parser.add_argument('--format', choices=FORMATS.keys(), required=True)
     parser.add_argument('filename')
     args = parser.parse_args()
+    if args.format == 'header':
+        with open(args.filename, 'rb') as fp:
+            header = fp.read(4096)
+            header_dict = parse_header(header)
+            print(header_dict)
+            return
+
     keys, fmt = FORMATS[args.format]
     try:
         for v in iterstructs(args.filename, fmt):
