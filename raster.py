@@ -70,6 +70,12 @@ def dummy_progress(i, n):
     pass
 
 
+def iterprogress(iterable, pi, n):
+    for i, row in enumerate(iterable):
+        yield row
+        pi(i+1, n)
+
+
 def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
     if pi is None:
         pi = show_progress(os.path.basename(filename))
