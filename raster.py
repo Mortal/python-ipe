@@ -149,6 +149,10 @@ def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
 
 
 def write_raster(filename, f, dtype, meta):
+    '''Write single-band raster to filename by invoking f() on the band.
+
+    See also raster_sink (for writing rows from a generator).
+    '''
     xsize = meta.RasterXSize
     ysize = meta.RasterYSize
     def f_ds(ds):
@@ -173,6 +177,7 @@ def write_generated_raster(filename, r, projection=None, geo_transform=None):
 
 
 def raster_sink(filename, iterable, dtype, meta):
+    '''Write single-band raster row-by-row to filename.'''
     def f(band):
         for i, row in enumerate(iterable):
             band.WriteArray(row.reshape(1, -1), 0, i)
