@@ -272,3 +272,12 @@ def add_nodata_row(iterable):
 def peek_row(iterable):
     row = next(iterable)
     return row, chain([row], iterable)
+
+
+def peek_dtype(iterable):
+    '''Peek the dtype of the first row of iterable.
+
+    Consumes iterable and returns (dtype, iterable).'''
+
+    row, iterable = peek_row(iterable)
+    return row.dtype, iterable
