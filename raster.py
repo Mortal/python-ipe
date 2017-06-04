@@ -222,6 +222,23 @@ def raster_sink(filename, iterable, dtype, meta):
     return write_raster(filename, f, dtype, meta)
 
 
+class RasterWriter:
+    def __init__(self, filename, dtype, meta):
+        self._writer = raster_writer_base(filename, dtype, meta)
+
+    def __enter__(self):
+        self._band = self._writer.__enter__()
+        self._current_row = 0
+        return self
+
+    def write_row(self, row):
+        self._band.WriteArray(row.reshape(1, -1), 0, self._current_row)
+        self._current_row += 1
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return self._writer.__exit__(exc_type, exc_value, traceback)
+
+
 def points_to_raster(filename, iterable, dtype, meta):
     def f():
         current_row = 0
