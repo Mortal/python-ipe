@@ -8,6 +8,7 @@ import os
 import sys
 import gdal
 import time
+import contextlib
 
 from itertools import chain
 
@@ -126,7 +127,7 @@ def iteroptions(driver, dtype, compress=True):
         yield ('COMPRESS', 'DEFLATE')
 
 
-def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
+def write_raster_gen(filename, dtype, xsize, ysize):
     driver_name = 'GTiff'
     out_driver = gdal.GetDriverByName(driver_name)
     try:
@@ -154,18 +155,48 @@ def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
         raise
 
 
+def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
+    g = write_raster_gen(filename, dtype, xsize, ysize)
+    ds = next(g)
+    try:
+        f_ds(ds)
+    except BaseException as exn:
+        g.throw(exn)
+        raise
+    band = next(g)
+    try:
+        f(band)
+    except BaseException as exn:
+        g.throw(exn)
+        raise
+    rest = list(g)  # Exhaust generator
+    assert rest == []
+
+
+@contextlib.contextmanager
+def raster_writer_base(filename, dtype, meta):
+    xsize = meta.RasterXSize
+    ysize = meta.RasterYSize
+    g = write_raster_gen(filename, dtype, xsize, ysize)
+    ds = next(g)
+    ds.SetGeoTransform(meta.GetGeoTransform())
+    ds.SetProjection(meta.GetProjection())
+    band = next(g)
+    try:
+        yield band
+    except BaseException as exn:
+        g.throw(exn)
+    rest = list(g)  # Exhaust generator
+    assert rest == []
+
+
 def write_raster(filename, f, dtype, meta):
     '''Write single-band raster to filename by invoking f() on the band.
 
     See also raster_sink (for writing rows from a generator).
     '''
-    xsize = meta.RasterXSize
-    ysize = meta.RasterYSize
-    def f_ds(ds):
-        ds.SetGeoTransform(meta.GetGeoTransform())
-        ds.SetProjection(meta.GetProjection())
-
-    return write_raster_base(filename, dtype, f, f_ds, xsize, ysize)
+    with raster_writer_base(filename, dtype, meta) as band:
+        f(band)
 
 
 def write_generated_raster(filename, r, projection=None, geo_transform=None):
