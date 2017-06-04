@@ -134,7 +134,14 @@ def write_raster_gen(filename, dtype, xsize, ysize):
         dtype_name = dtype.name
     except AttributeError:
         dtype_name = dtype.__name__
-    gdal_dtype = gdal.GetDataTypeByName(dtype_name)
+    dtypes = {
+        'bool': gdal.GDT_Byte,
+        'float32': gdal.GDT_Float32,
+        'float64': gdal.GDT_Float64,
+        'int32': gdal.GDT_Int32,
+        'uint32': gdal.GDT_UInt32,
+    }
+    gdal_dtype = dtypes[dtype_name]
 
     nbands = 1
 
@@ -145,10 +152,12 @@ def write_raster_gen(filename, dtype, xsize, ysize):
 
     ds = out_driver.Create(filename, xsize, ysize, nbands, gdal_dtype, options)
     try:
-        f_ds(ds)
+        yield ds
         band = ds.GetRasterBand(1)
         band.SetNoDataValue(np.float64(get_nodata_value(dtype)))
-        f(band)
+        yield band
+        del band
+        del ds
     except KeyboardInterrupt:
         print("Removing %r" % (filename,))
         os.remove(filename)
@@ -177,6 +186,9 @@ def write_raster_base(filename, dtype, f, f_ds, xsize, ysize):
 def raster_writer_base(filename, dtype, meta):
     xsize = meta.RasterXSize
     ysize = meta.RasterYSize
+    if xsize == 0 or ysize == 0:
+        raise Exception("Invalid raster meta supplied (size %d×%d)" %
+                        (xsize, ysize))
     g = write_raster_gen(filename, dtype, xsize, ysize)
     ds = next(g)
     ds.SetGeoTransform(meta.GetGeoTransform())
@@ -188,6 +200,8 @@ def raster_writer_base(filename, dtype, meta):
         g.throw(exn)
     rest = list(g)  # Exhaust generator
     assert rest == []
+    del band
+    del ds
 
 
 def write_raster(filename, f, dtype, meta):
@@ -225,6 +239,7 @@ def raster_sink(filename, iterable, dtype, meta):
 class RasterWriter:
     def __init__(self, filename, dtype, meta):
         self._writer = raster_writer_base(filename, dtype, meta)
+        self._band = None
 
     def __enter__(self):
         self._band = self._writer.__enter__()
@@ -236,7 +251,10 @@ class RasterWriter:
         self._current_row += 1
 
     def __exit__(self, exc_type, exc_value, traceback):
-        return self._writer.__exit__(exc_type, exc_value, traceback)
+        try:
+            return self._writer.__exit__(exc_type, exc_value, traceback)
+        finally:
+            self._writer = None
 
 
 def points_to_raster(filename, iterable, dtype, meta):
@@ -265,6 +283,8 @@ def load(filename, pi=None):
 
 
 def get_nodata_value(dtype):
+    if dtype in (np.bool_, bool):
+        return 2
     try:
         return np.iinfo(dtype).max
     except ValueError:
