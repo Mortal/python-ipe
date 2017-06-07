@@ -8,6 +8,7 @@ import os
 import sys
 import gdal
 import time
+import functools
 import contextlib
 
 from itertools import chain
@@ -77,11 +78,47 @@ def iterprogress(iterable, pi, n):
         pi(i+1, n)
 
 
+class ExitGenerator(Exception):
+    pass
+
+
+class ContextGenerator:
+    def __init__(self, gen):
+        self._gen = iter(gen)
+        self._throw = self._gen.throw
+
+    def __iter__(self):
+        return self._gen
+
+    def __next__(self):
+        return next(self._gen)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            self._throw(ExitGenerator())
+        except (ExitGenerator, StopIteration):
+            pass
+        else:
+            raise RuntimeError("Generator didn't stop upon ExitGenerator")
+
+
+def contextgenerator(gen_fn):
+    @functools.wraps(gen_fn)
+    def wrapper(*args, **kwargs):
+        return ContextGenerator(gen_fn(*args, **kwargs))
+
+    return wrapper
+
+
 def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
     if pi is None:
         pi = show_progress(os.path.basename(filename))
     ds = gdal.Open(filename)
 
+    @contextgenerator
     def it(ds):
         # xsize = ds.RasterXSize
         nrows = ds.RasterYSize
@@ -92,18 +129,21 @@ def iterrows(filename, pi=None, meta=False, buffer_rows=1, reverse=False):
             print("WARNING: Incorrect nodata value: %s != %s" %
                   (band.GetNoDataValue(), get_nodata_value(row.dtype)))
         progress = -1
-        for i in range(0, nrows, bufrows):
-            j = min(nrows, i + bufrows)
-            for k in range(j - i):
-                src_row = i + k
-                if reverse:
-                    src_row = nrows - src_row - 1
-                band.ReadAsArray(0, src_row, win_ysize=1, buf_obj=row[k:k+1])
-                yield row[k]
-                p = (i + 1) * 1000 // nrows
-                if p > progress and i + 1 < nrows:
-                    progress = p
-                    pi(i + 1, nrows)
+        try:
+            for i in range(0, nrows, bufrows):
+                j = min(nrows, i + bufrows)
+                for k in range(j - i):
+                    src_row = i + k
+                    if reverse:
+                        src_row = nrows - src_row - 1
+                    band.ReadAsArray(0, src_row, win_ysize=1, buf_obj=row[k:k+1])
+                    yield row[k]
+                    p = (i + 1) * 1000 // nrows
+                    if p > progress and i + 1 < nrows:
+                        progress = p
+                        pi(i + 1, nrows)
+        except ExitGenerator:
+            pass
         pi(nrows, nrows)
         # Without this del we get
         # "SystemError: <built-in function delete_Dataset> returned a result with an error set"
