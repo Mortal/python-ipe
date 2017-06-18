@@ -345,7 +345,9 @@ def nodata_like(row):
 
 
 def empty(shape, dtype):
-    return np.zeros(shape, dtype=dtype) + get_nodata_value(dtype)
+    result = np.empty(shape, dtype=dtype)
+    result[:] = get_nodata_value(dtype)
+    return result
 
 
 def window_single(iterable):
