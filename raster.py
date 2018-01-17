@@ -6,7 +6,7 @@ from __future__ import division
 
 import os
 import sys
-import gdal
+from osgeo import gdal
 import time
 import functools
 import contextlib
