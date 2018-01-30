@@ -320,13 +320,19 @@ def points_to_raster(filename, iterable, dtype, meta):
     return raster_sink(filename, f(), dtype, meta)
 
 
-def load(filename, pi=None, bands=None):
+def load(filename, pi=None, bands=None, meta=False, offset=(0, 0), size=()):
     ds = gdal.Open(filename)
+    read_args = offset + size
     if bands is not None:
-        return tuple(ds.GetRasterBand(i+1).ReadAsArray(0, 0)
+        data = tuple(ds.GetRasterBand(i+1).ReadAsArray(*read_args)
                      for i in range(bands))
-    band = ds.GetRasterBand(1)
-    return band.ReadAsArray(0, 0)
+    else:
+        band = ds.GetRasterBand(1)
+        data = band.ReadAsArray(*read_args)
+    if meta:
+        return ds, data
+    else:
+        return data
 
 
 def get_nodata_value(dtype):
