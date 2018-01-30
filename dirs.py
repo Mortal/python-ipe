@@ -82,10 +82,18 @@ highlight_pen = ['normal', 'heavier']
 
 
 def parse_rect_arg(s):
-    x, y, w, h = map(int, s.split(','))
-    if min((x, y, w, h)) < 0:
-        raise ValueError('Rectangle values must be non-negative')
-    return x, y, w, h
+    if s.startswith(('+', '-')):
+        cx, cy, w, h = s.split(',')
+        cx, cy = map(float, (cx, cy))
+        w, h = map(int, (w, h))
+        if min((w, h)) < 0:
+            raise ValueError('Rectangle lengths must be non-negative')
+        return 'coords', cx, cy, w, h
+    else:
+        x, y, w, h = map(int, s.split(','))
+        if min((x, y, w, h)) < 0:
+            raise ValueError('Rectangle values must be non-negative')
+        return 'grid', x, y, w, h
 
 
 parser = argparse.ArgumentParser()
@@ -95,7 +103,9 @@ parser.add_argument('--input-elev',
                     help='Elevation model to use for hillshaded background')
 parser.add_argument('-r', '--rect', metavar='X,Y,W,H', type=parse_rect_arg,
                     help='rectangle to render (top-left corner + size; ' +
-                    'default: all)')
+                    'default: all). If the string starts with "+" or "-", ' +
+                    'then X and Y are the rectangle center in coordinates; ' +
+                    'otherwise, X and Y are top-left column/row offsets.')
 parser.add_argument('--input-dfs', required=True,
                     help='DFS numbering raster')
 parser.add_argument('--input-dirs', required=True,
@@ -219,7 +229,27 @@ def main(ipedoc, input_dfs, input_dirs, input_elev=None,
     if rect is None:
         read_args = {}
     else:
-        x1, y1, width, height = rect
+        kind, x1, y1, width, height = rect
+        if kind == 'coords':
+            ds = raster.gdal.Open(input_dirs)
+            x0, dx, _1, y0, _2, dy = ds.GetGeoTransform()
+            assert _1 == _2 == 0
+            x1 = int((x1-x0) / dx - width/2)
+            y1 = int((y1-y0) / dy - height/2)
+            if not 0 <= x1 < ds.RasterXSize - width:
+                raise SystemExit('x-coordinates outside raster ' +
+                                 str((x1, ds.RasterXSize, width, ds.GetGeoTransform())))
+            if not 0 <= y1 < ds.RasterYSize - height:
+                raise SystemExit('y-coordinates outside raster ' +
+                                 str((y1, ds.RasterYSize, height, ds.GetGeoTransform())))
+            # TODO support computing on the boundary of the raster
+            if not 0 < x1 < ds.RasterXSize-width - 1:
+                raise SystemExit('Rectangle must be strictly within raster')
+            if not 0 < y1 < ds.RasterYSize-height - 1:
+                raise SystemExit('Rectangle must be strictly within raster')
+            del ds
+        else:
+            assert kind == 'grid'
         read_args = dict(offset=(x1-1, y1-1), size=(width+2, height+2))
 
     subtree_size = load_subtree_size_from_dfs(
