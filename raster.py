@@ -72,7 +72,11 @@ def dummy_progress(i, n):
     pass
 
 
-def iterprogress(iterable, pi, n):
+def iterprogress(iterable, pi=None, n=None):
+    if n is None:
+        n = len(iterable)
+    if pi is None:
+        pi = show_progress()
     for i, row in enumerate(iterable):
         yield row
         pi(i+1, n)
