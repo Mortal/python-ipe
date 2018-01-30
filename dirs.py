@@ -17,8 +17,8 @@ from hillshade import hillshade  # noqa
 PROG_NAME = 'dirs.py'
 
 
-def load_subtree_size_from_dfs(filename):
-    a, b, c, d = raster.load(filename, bands=4)
+def load_subtree_size_from_dfs(filename, **kwargs):
+    a, b, c, d = raster.load(filename, bands=4, **kwargs)
     e = np.ascontiguousarray(np.transpose((a, b), (1, 2, 0))).view(np.uint64)
     f = np.ascontiguousarray(np.transpose((c, d), (1, 2, 0))).view(np.uint64)
     result = 1 + (f - e) // 2
@@ -33,9 +33,7 @@ DY[2] = DY[4] = DY[8] = 1  # south
 DY[32] = DY[64] = DY[128] = -1  # north
 
 
-def extract(subtree_size, dirs, y1, y2, x1, x2):
-    subtree_size = subtree_size[y1-1:y2+1, x1-1:x2+1]
-    dirs = dirs[y1-1:y2+1, x1-1:x2+1]
+def extract(subtree_size, dirs):
     n, m = subtree_size.shape
     for i in range(n):
         for j in range(m) if i in (0, n-1) else (0, m-1):
@@ -218,19 +216,19 @@ class IpeDoc:
 
 def main(ipedoc, input_dfs, input_dirs, input_elev=None,
          rect=None, light_angle=45, light_azimuth=315, z_factor=20):
-    subtree_size = load_subtree_size_from_dfs(input_dfs)
-    dirs = raster.load(input_dirs)
-    n, m = dirs.shape
     if rect is None:
-        x1, y1 = 1, 1
-        x2, y2 = m-1, n-1
+        read_args = {}
     else:
         x1, y1, width, height = rect
-        x2 = x1 + width
-        y2 = y1 + height
-    subtree_size, dirs = extract(subtree_size, dirs, y1, y2, x1, x2)
+        read_args = dict(offset=(x1-1, y1-1), size=(width+2, height+2))
+
+    subtree_size = load_subtree_size_from_dfs(
+        input_dfs, **read_args)
+    dirs = raster.load(input_dirs, **read_args)
+
+    subtree_size, dirs = extract(subtree_size, dirs)
     if input_elev:
-        hs = hillshade(raster.load(input_elev)[y1-1:y2+1, x1-1:x2+1],
+        hs = hillshade(raster.load(input_elev, **read_args),
                        light_angle, light_azimuth, z_factor)
         bitmap_id = ipedoc.add_bitmap(hs.astype(np.uint8))
         image = '<image rect="-0.5 {y} {x} 0.5" bitmap="{id}"/>'.format(
