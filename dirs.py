@@ -91,15 +91,22 @@ def extract(subtree_size, dirs):
             pj = j + DX[dir]
             if (pi in (0, n-1)) or (pj in (0, m-1)):
                 dirs[i, j] = 255  # Set dir to nodata
-    return subtree_size[1:-1, 1:-1], dirs[1:-1, 1:-1]
+    # Make copy to ensure contiguous result
+    return np.array(subtree_size[1:-1, 1:-1]), np.array(dirs[1:-1, 1:-1])
 
 
 def find_highlight(dirs, cx1, cx2, cy1, cy2):
-    return dfs(dirs, (cy1, cx1, cx2-cx1, cy2-cy1))
+    n, m = dirs.shape
+    marks = dfs(dirs, (cy1, cx1, cx2-cx1, cy2-cy1))
+    dfs(dirs, (0, 0, m, 1), marks, 2)
+    dfs(dirs, (1, 0, 1, n-2), marks, 2)
+    dfs(dirs, (1, m-1, 1, n-2), marks, 2)
+    dfs(dirs, (n-1, 0, m, 1), marks, 2)
+    return marks
 
 
-highlight_color = ['darkblue', 'blue']
-highlight_pen = ['normal', 'heavier']
+highlight_color = ['darkblue', 'blue', 'red', 'purple']
+highlight_pen = ['normal', 'normal', 'normal', 'heavier']
 
 
 def parse_rect_arg(s):
@@ -338,7 +345,7 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
                 path.append((pj, -pi, 'l'))
                 if child_dir[pi, pj] != dir:
                     break
-                hi = max(hi, highlight[pi, pj])
+                hi |= highlight[pi, pj]
                 dir = dirs[pi, pj]
                 if dir in (0, 255):
                     break
