@@ -332,18 +332,20 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
             pj = j + DX[dir]
             assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0])
             path = [(j, -i, 'm')]
+            hi = highlight[i, j]
             while True:
                 assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0])
                 path.append((pj, -pi, 'l'))
                 if child_dir[pi, pj] != dir:
                     break
+                hi = max(hi, highlight[pi, pj])
                 dir = dirs[pi, pj]
                 if dir in (0, 255):
                     break
                 pi += DY[dir]
                 pj += DX[dir]
-            group.path(path, stroke=highlight_color[highlight[i, j]],
-                       pen=highlight_pen[highlight[i, j]])
+            group.path(path, stroke=highlight_color[hi],
+                       pen=highlight_pen[hi])
     for i, row in enumerate(dirs):
         for j, dir in enumerate(row):
             if dir == 0:
