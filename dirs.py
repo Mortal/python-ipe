@@ -17,7 +17,7 @@ from hillshade import hillshade  # noqa
 try:
     from griddfs import dfs
 except ImportError:
-    print("Could not import griddfs")
+    print("Consider running pip install --user https://github.com/Mortal/griddfs/releases/download/v0.1.0/griddfs-0.1.0-py2.py3-none-manylinux1_x86_64.whl")
 
     def dfs(dirs, sources, marks=None, mark=1):
         dirs = np.asarray(dirs, dtype=np.uint8)
