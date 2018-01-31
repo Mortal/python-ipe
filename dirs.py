@@ -14,6 +14,34 @@ import raster  # noqa
 from hillshade import hillshade  # noqa
 
 
+try:
+    from griddfs import dfs
+except ImportError:
+    print("Could not import griddfs")
+
+    def dfs(dirs, sources, marks=None, mark=1):
+        dirs = np.asarray(dirs, dtype=np.uint8)
+        if marks is None:
+            marks = np.zeros_like(dirs)
+        assert dirs.shape == marks.shape
+        try:
+            top, left, width, height = sources
+        except ValueError:
+            top, left = sources
+            width = height = 1
+        for i in range(top, top+height):
+            for j in range(left, left+width):
+                pos = i, j
+                marks[pos] |= mark
+                pos = neighbor(pos, dirs[pos])
+                while pos is not None:
+                    if marks[pos] & mark != 0:
+                        break
+                    marks[pos] |= mark
+                    pos = neighbor(pos, dirs[pos])
+        return marks
+
+
 PROG_NAME = 'dirs.py'
 
 
@@ -31,6 +59,15 @@ DX[1] = DX[2] = DX[128] = 1  # east
 DX[8] = DX[16] = DX[32] = -1  # west
 DY[2] = DY[4] = DY[8] = 1  # south
 DY[32] = DY[64] = DY[128] = -1  # north
+
+
+def neighbor(pos, dir):
+    i, j = pos
+    if dir in (0, 255):
+        return None
+    i += DX[dir]
+    j += DY[dir]
+    return i, j
 
 
 def extract(subtree_size, dirs):
@@ -58,23 +95,7 @@ def extract(subtree_size, dirs):
 
 
 def find_highlight(dirs, cx1, cx2, cy1, cy2):
-    highlight = np.zeros(dirs.shape, np.uint8)
-    highlight[cy1:cy2, cx1:cx2] = 1
-    for i in range(cy1, cy2):
-        for j in range(cx1, cx2) if i in (cy1, cy2-1) else (cx1, cx2-1):
-            dir = dirs[i, j]
-            if dir in (0, 255):
-                continue
-            pi = i + DY[dir]
-            pj = j + DX[dir]
-            while not ((cy1 <= pi < cy2 and cx1 <= pj < cx2) or highlight[pi, pj]):
-                highlight[pi, pj] = 1
-                dir = dirs[pi, pj]
-                if dir in (0, 255):
-                    break
-                pi += DY[dir]
-                pj += DX[dir]
-    return highlight
+    return dfs(dirs, (cy1, cx1, cx2-cx1, cy2-cy1))
 
 
 highlight_color = ['darkblue', 'blue']
