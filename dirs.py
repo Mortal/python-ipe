@@ -221,7 +221,7 @@ def parse_args():
             yield args
         if output and output.endswith('.pdf'):
             fp.flush()
-            subprocess.check_call(('iperender', '-pdf', fp.name, output))
+            subprocess.check_call(('ipetoipe', '-pdf', fp.name, output))
 
     if output is not None:
         # Only write rerun script if output is a regular file.
