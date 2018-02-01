@@ -422,6 +422,18 @@ def follow_selected_path(dirs, child_dir, i, j):
 def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
                 cx1, cx2, cy1, cy2):
     n, m = dirs.shape
+    group.path(
+        [(cy1, cx1, 'm'),
+         (cy1, cx2-1, 'l'),
+         (cy2-1, cx2-1, 'l'),
+         (cy2-1, cx1, 'l'),
+         ('h',),
+         (0, 0, 'm'),
+         (0, m-1, 'l'),
+         (n-1, m-1, 'l'),
+         (n-1, 0, 'l'),
+         ('h',)],
+        stroke='brown', pen='ultrafat')
     for i, row in enumerate(dirs):
         for j, dir in enumerate(row):
             if dir in (0, 255) or subtree_size[i, j] > 1:
@@ -440,18 +452,6 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
         for j, dir in enumerate(row):
             if dir == 0:
                 group.mark(i, j, 'disk', size='small', stroke='blue')
-    group.path(
-        [(cy1, cx1, 'm'),
-         (cy1, cx2-1, 'l'),
-         (cy2-1, cx2-1, 'l'),
-         (cy2-1, cx1, 'l'),
-         ('h',),
-         (0, 0, 'm'),
-         (0, m-1, 'l'),
-         (n-1, m-1, 'l'),
-         (n-1, 0, 'l'),
-         ('h',)],
-        stroke='brown', pen='ultrafat')
 
 
 if __name__ == '__main__':
