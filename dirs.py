@@ -387,19 +387,15 @@ def main(ipedoc, input_dfs, input_dirs=None, input_elev=None,
     child_weight = np.zeros(dirs.shape, np.uint64)
     child_dir = np.zeros(dirs.shape, np.uint8)
     highlight = find_highlight(dirs, cx1, cx2, cy1, cy2)
-    child_highlight = np.zeros_like(highlight)
     for i, row in enumerate(dirs):
         for j, dir in enumerate(row):
             if dir in (0, 255):
                 continue
             pi, pj = neighbor((i, j), dir)
-            hi = highlight[i, j]
             assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0]), (i, j, dir, pi, pj)
-            phi = child_highlight[pi, pj]
-            if (phi, child_weight[pi, pj]) < (hi, subtree_size[i, j]):
+            if child_weight[pi, pj] < subtree_size[i, j]:
                 child_dir[pi, pj] = dir
                 child_weight[pi, pj] = subtree_size[i, j]
-                child_highlight[pi, pj] = hi
     with ipedoc.page() as page:
         with page.group(2, 0, 0, 2, 0, 0) as group:
             if image:
