@@ -45,28 +45,89 @@ except ImportError:
 PROG_NAME = 'dirs.py'
 
 
-def load_subtree_size_from_dfs(filename, **kwargs):
+def load_subtree_size_from_dfs(filename, return_dfs=False, **kwargs):
     a, b, c, d = raster.load(filename, bands=4, **kwargs)
-    e = np.ascontiguousarray(np.transpose((a, b), (1, 2, 0))).view(np.uint64)
-    f = np.ascontiguousarray(np.transpose((c, d), (1, 2, 0))).view(np.uint64)
+    e = np.ascontiguousarray(np.transpose((a, b), (1, 2, 0))).view(np.uint64)[:, :, 0]
+    f = np.ascontiguousarray(np.transpose((c, d), (1, 2, 0))).view(np.uint64)[:, :, 0]
     result = 1 + (f - e) // 2
-    return result.reshape(a.shape)
+    result = result.reshape(a.shape)
+    if not return_dfs:
+        return result
+    return result, (e, f)
 
 
-DX = [0]*129
-DY = [0]*129
-DX[1] = DX[2] = DX[128] = 1  # east
-DX[8] = DX[16] = DX[32] = -1  # west
-DY[2] = DY[4] = DY[8] = 1  # south
-DY[32] = DY[64] = DY[128] = -1  # north
+DIR_E = (0, 1)
+DIR_SE = (1, 1)
+DIR_S = (1, 0)
+DIR_SW = (1, -1)
+DIR_W = (0, -1)
+DIR_NW = (-1, -1)
+DIR_N = (-1, 0)
+DIR_NE = (-1, 1)
+DIR_NAMES = [
+    '\N{RIGHTWARDS ARROW}',
+    '\N{SOUTH EAST ARROW}',
+    '\N{DOWNWARDS ARROW}',
+    '\N{SOUTH WEST ARROW}',
+    '\N{LEFTWARDS ARROW}',
+    '\N{NORTH WEST ARROW}',
+    '\N{UPWARDS ARROW}',
+    '\N{NORTH EAST ARROW}',
+]
+DIRS = [
+    DIR_E, DIR_SE, DIR_S, DIR_SW, DIR_W, DIR_NW, DIR_N, DIR_NE,
+]
+
+
+def print_dirs(dirs):
+    names = ['\N{MIDDLE DOT}'] + DIR_NAMES
+    print('\n'.join(''.join(names[int(v).bit_length()] for v in row)
+                    for row in dirs))
+    print('-'*dirs.shape[1])
+
+
+def dirs_from_dfs(dfs):
+    discover, finish = dfs
+    assert discover.shape == finish.shape
+    assert discover.ndim == 2, discover.shape
+    subtree_size = (1 + (finish - discover) // 2).astype(np.int64)
+    discover_pad = np.pad(discover, 1, 'constant')
+    finish_pad = np.pad(finish, 1, 'constant')
+    subtree_size = np.pad(subtree_size, 1, 'constant')
+    maxint = np.iinfo(subtree_size.dtype).max
+
+    contained = []
+    slices = [slice(0, -2), slice(1, -1), slice(2, None)]
+    for i, j in DIRS:
+        dir_slice = (slices[i+1], slices[j+1])
+        # Compare discover times to the (d,f)-interval of the (i,j)-neighbor
+        contained.append(np.where(
+            (discover_pad[dir_slice] < discover) &
+            (discover < finish_pad[dir_slice]),
+            subtree_size[dir_slice],
+            maxint))
+    contained = np.asarray(contained)
+    assert contained.dtype == subtree_size.dtype
+    assert contained.shape == (8,) + discover.shape, contained.shape
+    # Compute direction index for each cell
+    direction_index = np.argmin(contained, axis=0)
+    # A cell is a non-sink if it is contained
+    # in the neighbor pointed to by its direction index
+    has_dir = (np.choose(direction_index, contained) != maxint)
+
+    res = np.zeros(discover.shape, np.uint8)
+    # Set flow directions for non-sinks to a non-zero value
+    res[has_dir] = 1 << direction_index[has_dir]
+    return res
 
 
 def neighbor(pos, dir):
     i, j = pos
     if dir in (0, 255):
         return None
-    i += DX[dir]
-    j += DY[dir]
+    dx, dy = DIRS[int(dir).bit_length()-1]
+    i += dx
+    j += dy
     return i, j
 
 
@@ -77,8 +138,7 @@ def extract(subtree_size, dirs):
             dir = dirs[i, j]
             if dir in (0, 255):
                 continue
-            pi = i + DY[dir]
-            pj = j + DX[dir]
+            pi, pj = neighbor((i, j), dir)
             if 0 < pi < n-1 and 0 < pj < m-1:
                 assert subtree_size[pi, pj] > subtree_size[i, j]
                 subtree_size[pi, pj] -= subtree_size[i, j]
@@ -87,8 +147,7 @@ def extract(subtree_size, dirs):
             dir = dirs[i, j]
             if dir in (0, 255):
                 continue
-            pi = i + DY[dir]
-            pj = j + DX[dir]
+            pi, pj = neighbor((i, j), dir)
             if (pi in (0, n-1)) or (pj in (0, m-1)):
                 dirs[i, j] = 255  # Set dir to nodata
     # Make copy to ensure contiguous result
@@ -136,7 +195,7 @@ parser.add_argument('-r', '--rect', metavar='X,Y,W,H', type=parse_rect_arg,
                     'otherwise, X and Y are top-left column/row offsets.')
 parser.add_argument('--input-dfs', required=True,
                     help='DFS numbering raster')
-parser.add_argument('--input-dirs', required=True,
+parser.add_argument('--input-dirs',
                     help='Flow directions raster')
 parser.add_argument('-o', '--output',
                     help='Ipe selection output file (default: stdout)')
@@ -252,14 +311,14 @@ class IpeDoc:
                    '%s/>' % ''.join(' %s="%s"' % kv for kv in attrs.items()))
 
 
-def main(ipedoc, input_dfs, input_dirs, input_elev=None,
+def main(ipedoc, input_dfs, input_dirs=None, input_elev=None,
          rect=None, light_angle=45, light_azimuth=315, z_factor=20):
     if rect is None:
         read_args = {}
     else:
         kind, x1, y1, width, height = rect
         if kind == 'coords':
-            ds = raster.gdal.Open(input_dirs)
+            ds = raster.gdal.Open(input_dfs)
             x0, dx, _1, y0, _2, dy = ds.GetGeoTransform()
             assert _1 == _2 == 0
             x1 = int((x1-x0) / dx - width/2)
@@ -280,9 +339,19 @@ def main(ipedoc, input_dfs, input_dirs, input_elev=None,
             assert kind == 'grid'
         read_args = dict(offset=(x1-1, y1-1), size=(width+2, height+2))
 
-    subtree_size = load_subtree_size_from_dfs(
-        input_dfs, **read_args)
-    dirs = raster.load(input_dirs, **read_args)
+    if input_dirs is None:
+        subtree_size, dfs = load_subtree_size_from_dfs(
+            input_dfs, **read_args, return_dfs=True)
+        dirs = dirs_from_dfs(dfs)
+    else:
+        # subtree_size, dfs = load_subtree_size_from_dfs(
+        #     input_dfs, **read_args, return_dfs=True)
+        # dirs = raster.load(input_dirs, **read_args)
+        # dirs_test = dirs_from_dfs(dfs)
+        # assert np.all(dirs[1:-1, 1:-1] == dirs_test[1:-1, 1:-1])
+        subtree_size = load_subtree_size_from_dfs(
+            input_dfs, **read_args)
+        dirs = raster.load(input_dirs, **read_args)
 
     subtree_size, dirs = extract(subtree_size, dirs)
     if input_elev:
@@ -307,8 +376,7 @@ def main(ipedoc, input_dfs, input_dirs, input_elev=None,
         for j, dir in enumerate(row):
             if dir in (0, 255):
                 continue
-            pi = i + DY[dir]
-            pj = j + DX[dir]
+            pi, pj = neighbor((i, j), dir)
             hi = highlight[i, j]
             assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0]), (i, j, dir, pi, pj)
             phi = child_highlight[pi, pj]
@@ -335,8 +403,7 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
                 continue
             if subtree_size[i, j] > 1:
                 continue
-            pi = i + DY[dir]
-            pj = j + DX[dir]
+            pi, pj = neighbor((i, j), dir)
             assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0])
             path = [(j, -i, 'm')]
             hi = highlight[i, j]
@@ -349,8 +416,7 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
                 dir = dirs[pi, pj]
                 if dir in (0, 255):
                     break
-                pi += DY[dir]
-                pj += DX[dir]
+                pi, pj = neighbor((pi, pj), dir)
             group.path(path, stroke=highlight_color[hi],
                        pen=highlight_pen[hi])
     for i, row in enumerate(dirs):
