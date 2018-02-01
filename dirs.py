@@ -6,8 +6,10 @@ import shlex
 import base64
 import argparse
 import datetime
+import tempfile
 import textwrap
 import contextlib
+import subprocess
 import numpy as np
 sys.path.append('/home/rav/pygdal')
 import raster  # noqa
@@ -208,12 +210,20 @@ def parse_args():
     with contextlib.ExitStack() as stack:
         if output is None:
             fp = sys.stdout
+        elif output.endswith('.pdf'):
+            cwd = os.getcwd()
+            quoted_argv = ' '.join(shlex.quote(arg) for arg in sys.argv)
+            fp = stack.enter_context(tempfile.NamedTemporaryFile('w', suffix='.ipe'))
         else:
             cwd = os.getcwd()
             quoted_argv = ' '.join(shlex.quote(arg) for arg in sys.argv)
             fp = stack.enter_context(open(output, 'w'))
-        args['ipedoc'] = stack.enter_context(IpeDoc(fp))
-        yield args
+        with IpeDoc(fp) as ipedoc:
+            args['ipedoc'] = ipedoc
+            yield args
+        if output and output.endswith('.pdf'):
+            fp.flush()
+            subprocess.check_call(('iperender', '-pdf', fp.name, output))
 
     if output is not None:
         # Only write rerun script if output is a regular file.
