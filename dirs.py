@@ -8,6 +8,7 @@ import argparse
 import datetime
 import tempfile
 import textwrap
+import itertools
 import contextlib
 import subprocess
 import numpy as np
@@ -135,18 +136,36 @@ def extract(subtree_size, dirs):
     return np.array(subtree_size[1:-1, 1:-1]), np.array(dirs[1:-1, 1:-1])
 
 
+MARK_FROM_INNER = 2**0
+MARK_FROM_OUTER = 2**1
+MARK_TO_OUTER = 2**2
+MARK_TO_INNER = 2**3
+
+MARK_OUT = MARK_FROM_INNER | MARK_TO_OUTER
+MARK_IN = MARK_FROM_OUTER | MARK_TO_INNER
+
+
 def find_highlight(dirs, cx1, cx2, cy1, cy2):
     n, m = dirs.shape
-    marks = mark_downstream(dirs, (cy1, cx1, cx2-cx1, cy2-cy1), mark=1)
-    mark_downstream(dirs, (0, 0, m, 1), marks, mark=2)
-    mark_downstream(dirs, (1, 0, 1, n-2), marks, mark=2)
-    mark_downstream(dirs, (1, m-1, 1, n-2), marks, mark=2)
-    mark_downstream(dirs, (n-1, 0, m, 1), marks, mark=2)
+    marks = mark_downstream(dirs, (cy1, cx1, cx2-cx1, cy2-cy1), mark=MARK_FROM_INNER)
+    mark_downstream(dirs, (0, 0, m, 1), marks, mark=MARK_FROM_OUTER)
+    mark_downstream(dirs, (1, 0, 1, n-2), marks, mark=MARK_FROM_OUTER)
+    mark_downstream(dirs, (1, m-1, 1, n-2), marks, mark=MARK_FROM_OUTER)
+    mark_downstream(dirs, (n-1, 0, m, 1), marks, mark=MARK_FROM_OUTER)
+    mark_upstream(dirs, (0, 0, m, 1), marks, mark=MARK_TO_OUTER)
+    mark_upstream(dirs, (1, 0, 1, n-2), marks, mark=MARK_TO_OUTER)
+    mark_upstream(dirs, (1, m-1, 1, n-2), marks, mark=MARK_TO_OUTER)
+    mark_upstream(dirs, (n-1, 0, m, 1), marks, mark=MARK_TO_OUTER)
+    mark_upstream(dirs, (cy1, cx1, cx2-cx1, cy2-cy1), marks, mark=MARK_TO_INNER)
     return marks
 
 
-highlight_color = ['darkblue', 'blue', 'red', 'purple']
-highlight_pen = ['normal', 'normal', 'normal', 'heavier']
+def highlight_style(mark):
+    if mark & MARK_OUT == MARK_OUT:
+        return 'blue', 'heavier'
+    if mark & MARK_IN == MARK_IN:
+        return 'purple', 'heavier'
+    return 'darkblue', 'normal'
 
 
 def parse_rect_arg(s):
@@ -383,33 +402,37 @@ def main(ipedoc, input_dfs, input_dirs=None, input_elev=None,
                         cx1, cx2, cy1, cy2)
 
 
+def follow_selected_path(dirs, child_dir, i, j):
+    dir = dirs[i, j]
+    assert dir not in (0, 255)
+    n = neighbor((i, j), dir)
+    while n is not None:
+        pi, pj = n
+        assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0])
+        yield (pi, pj)
+        if child_dir[pi, pj] != dir:
+            break
+        dir = dirs[pi, pj]
+        n = neighbor((pi, pj), dir)
+
+
 def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
                 cx1, cx2, cy1, cy2):
     n, m = dirs.shape
     for i, row in enumerate(dirs):
         for j, dir in enumerate(row):
-            if dir == 0:
+            if dir in (0, 255) or subtree_size[i, j] > 1:
                 continue
-            if dir == 255:
-                continue
-            if subtree_size[i, j] > 1:
-                continue
-            pi, pj = neighbor((i, j), dir)
-            assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0])
-            path = [(j, -i, 'm')]
             hi = highlight[i, j]
-            while True:
-                assert 0 <= pi < len(dirs) and 0 <= pj < len(dirs[0])
-                path.append((pj, -pi, 'l'))
-                if child_dir[pi, pj] != dir:
-                    break
-                hi |= highlight[pi, pj]
-                dir = dirs[pi, pj]
-                if dir in (0, 255):
-                    break
-                pi, pj = neighbor((pi, pj), dir)
-            group.path(path, stroke=highlight_color[hi],
-                       pen=highlight_pen[hi])
+            path = follow_selected_path(dirs, child_dir, i, j)
+            cur_path = [(j, -i, 'm')]
+            parts = itertools.groupby(
+                path, key=lambda pos: highlight_style(highlight[pos]))
+            for (stroke, pen), part in parts:
+                for ii, jj in part:
+                    cur_path.append((jj, -ii, 'l'))
+                group.path(cur_path, stroke=stroke, pen=pen)
+                cur_path = [(jj, -ii, 'm')]
     for i, row in enumerate(dirs):
         for j, dir in enumerate(row):
             if dir == 0:
