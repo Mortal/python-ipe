@@ -252,7 +252,7 @@ class IpeDoc:
     def __enter__(self):
         self.print('<?xml version="1.0"?>')
         self.print('<!DOCTYPE ipe SYSTEM "ipe.dtd">')
-        self.print('<ipe version="70206" creator="%s">' % PROG_NAME)
+        self.print('<ipe version="70110" creator="%s">' % PROG_NAME)
         t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
         self.print('<info created="D:%s" modified="D:%s"/>' % (t, t))
         return self
