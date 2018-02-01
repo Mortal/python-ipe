@@ -1,6 +1,6 @@
 import os
+import re
 import sys
-import glob
 import zlib
 import shlex
 import base64
@@ -229,22 +229,27 @@ def parse_args():
 
 
 class IpeDoc:
-    @classmethod
-    def read_ipestyle(cls, name='basic'):
-        pattern = '/usr/share/ipe/*/styles/%s.isy' % name
-        filenames = glob.glob(pattern)
-        if not filenames:
-            raise FileNotFoundError(pattern)
-        with open(max(filenames)) as fp:
+    def read_ipestyle(self, name='basic'):
+        filename = '/usr/share/ipe/%s/styles/%s.isy' % (
+            '.'.join(map(str, self.version)), name)
+        with open(filename) as fp:
             xml_ver = fp.readline()
             doctype = fp.readline()
             assert xml_ver == '<?xml version="1.0"?>\n'
             assert doctype == '<!DOCTYPE ipestyle SYSTEM "ipe.dtd">\n'
             return fp.read().rstrip()
 
+    @classmethod
+    def find_version(cls):
+        mo = max((re.match(r'^(\d+)\.(\d+)\.(\d+)$', v)
+                  for v in os.listdir('/usr/share/ipe')),
+                 key=lambda mo: (mo is not None, mo and mo.group(0)))
+        return tuple(map(int, mo.group(1, 2, 3)))
+
     def __init__(self, output_fp):
         self.output_fp = output_fp
         self.bitmaps = []
+        self.version = self.find_version()
 
     def print(self, *args, **kwargs):
         print(*args, **kwargs, file=self.output_fp)
@@ -252,7 +257,8 @@ class IpeDoc:
     def __enter__(self):
         self.print('<?xml version="1.0"?>')
         self.print('<!DOCTYPE ipe SYSTEM "ipe.dtd">')
-        self.print('<ipe version="70110" creator="%s">' % PROG_NAME)
+        version = '%d%02d%02d' % self.version
+        self.print('<ipe version="%s" creator="%s">' % (version, PROG_NAME))
         t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
         self.print('<info created="D:%s" modified="D:%s"/>' % (t, t))
         return self
