@@ -17,31 +17,10 @@ from hillshade import hillshade  # noqa
 
 
 try:
-    from griddfs import dfs
+    from griddfs import mark_downstream, mark_upstream
 except ImportError:
-    print("Consider running pip install --user https://github.com/Mortal/griddfs/releases/download/v0.1.0/griddfs-0.1.0-py2.py3-none-manylinux1_x86_64.whl")
-
-    def dfs(dirs, sources, marks=None, mark=1):
-        dirs = np.asarray(dirs, dtype=np.uint8)
-        if marks is None:
-            marks = np.zeros_like(dirs)
-        assert dirs.shape == marks.shape
-        try:
-            top, left, width, height = sources
-        except ValueError:
-            top, left = sources
-            width = height = 1
-        for i in range(top, top+height):
-            for j in range(left, left+width):
-                pos = i, j
-                marks[pos] |= mark
-                pos = neighbor(pos, dirs[pos])
-                while pos is not None:
-                    if marks[pos] & mark != 0:
-                        break
-                    marks[pos] |= mark
-                    pos = neighbor(pos, dirs[pos])
-        return marks
+    print("Could not import griddfs.")
+    print("Consider running pip install --user https://github.com/Mortal/griddfs/releases/download/v0.2.0/griddfs-0.2.0-py2.py3-none-manylinux1_x86_64.whl")
 
 
 PROG_NAME = 'dirs.py'
@@ -158,11 +137,11 @@ def extract(subtree_size, dirs):
 
 def find_highlight(dirs, cx1, cx2, cy1, cy2):
     n, m = dirs.shape
-    marks = dfs(dirs, (cy1, cx1, cx2-cx1, cy2-cy1))
-    dfs(dirs, (0, 0, m, 1), marks, 2)
-    dfs(dirs, (1, 0, 1, n-2), marks, 2)
-    dfs(dirs, (1, m-1, 1, n-2), marks, 2)
-    dfs(dirs, (n-1, 0, m, 1), marks, 2)
+    marks = mark_downstream(dirs, (cy1, cx1, cx2-cx1, cy2-cy1), mark=1)
+    mark_downstream(dirs, (0, 0, m, 1), marks, mark=2)
+    mark_downstream(dirs, (1, 0, 1, n-2), marks, mark=2)
+    mark_downstream(dirs, (1, m-1, 1, n-2), marks, mark=2)
+    mark_downstream(dirs, (n-1, 0, m, 1), marks, mark=2)
     return marks
 
 
