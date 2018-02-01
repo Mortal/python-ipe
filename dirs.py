@@ -368,16 +368,18 @@ def main(ipedoc, input_dfs, input_dirs=None, input_elev=None,
         dirs = raster.load(input_dirs, **read_args)
 
     subtree_size, dirs = extract(subtree_size, dirs)
+    n, m = dirs.shape
+    scale = 2
     if input_elev:
         hs = hillshade(raster.load(input_elev, **read_args),
                        light_angle, light_azimuth, z_factor)
         bitmap_id = ipedoc.add_bitmap(hs.astype(np.uint8))
-        image = '<image rect="-0.5 {y} {x} 0.5" bitmap="{id}"/>'.format(
-            x=hs.shape[1]-0.5, y=-(hs.shape[0]-0.5), id=bitmap_id)
+        # rect is lower left xy, upper right xy
+        image = '<image rect="0 0 {m} {n}" bitmap="{id}" matrix="{s} 0 0 {s} 0 0"/>'.format(
+            m=hs.shape[1], n=hs.shape[0], id=bitmap_id, s=scale)
     else:
         image = None
 
-    n, m = dirs.shape
     cx1 = m//3
     cx2 = m-cx1
     cy1 = n//3
@@ -395,9 +397,10 @@ def main(ipedoc, input_dfs, input_dirs=None, input_elev=None,
                 child_dir[pi, pj] = dir
                 child_weight[pi, pj] = subtree_size[i, j]
     with ipedoc.page() as page:
-        with page.group(2, 0, 0, 2, 0, 0) as group:
-            if image:
-                group.print(image)
+        # (i,j)->(2j,2n-2i)
+        if image:
+            page.print(image)
+        with page.group(0, -scale, scale, 0, scale*0.5, scale*(n-0.5)) as group:
             output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
                         cx1, cx2, cy1, cy2)
 
@@ -425,28 +428,28 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
                 continue
             hi = highlight[i, j]
             path = follow_selected_path(dirs, child_dir, i, j)
-            cur_path = [(j, -i, 'm')]
+            cur_path = [(i, j, 'm')]
             parts = itertools.groupby(
                 path, key=lambda pos: highlight_style(highlight[pos]))
             for (stroke, pen), part in parts:
                 for ii, jj in part:
-                    cur_path.append((jj, -ii, 'l'))
+                    cur_path.append((ii, jj, 'l'))
                 group.path(cur_path, stroke=stroke, pen=pen)
-                cur_path = [(jj, -ii, 'm')]
+                cur_path = [(ii, jj, 'm')]
     for i, row in enumerate(dirs):
         for j, dir in enumerate(row):
             if dir == 0:
-                group.mark(j, -i, 'disk', size='small', stroke='blue')
+                group.mark(i, j, 'disk', size='small', stroke='blue')
     group.path(
-        [(cx1, -cy1, 'm'),
-         (cx2-1, -cy1, 'l'),
-         (cx2-1, -(cy2-1), 'l'),
-         (cx1, -(cy2-1), 'l'),
+        [(cy1, cx1, 'm'),
+         (cy1, cx2-1, 'l'),
+         (cy2-1, cx2-1, 'l'),
+         (cy2-1, cx1, 'l'),
          ('h',),
          (0, 0, 'm'),
-         (m-1, 0, 'l'),
-         (m-1, -(n-1), 'l'),
-         (0, -(n-1), 'l'),
+         (0, m-1, 'l'),
+         (n-1, m-1, 'l'),
+         (n-1, 0, 'l'),
          ('h',)],
         stroke='brown', pen='ultrafat')
 
