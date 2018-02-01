@@ -162,10 +162,10 @@ def find_highlight(dirs, cx1, cx2, cy1, cy2):
 
 def highlight_style(mark):
     if mark & MARK_OUT == MARK_OUT:
-        return 'blue', 'heavier'
+        return dict(stroke='blue', pen='heavier')
     if mark & MARK_IN == MARK_IN:
-        return 'purple', 'heavier'
-    return 'darkblue', 'normal'
+        return dict(stroke='purple', pen='heavier')
+    return dict(stroke='darkblue')
 
 
 def parse_rect_arg(s):
@@ -438,16 +438,27 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
         for j, dir in enumerate(row):
             if dir in (0, 255) or subtree_size[i, j] > 1:
                 continue
-            hi = highlight[i, j]
             path = follow_selected_path(dirs, child_dir, i, j)
             cur_path = [(i, j, 'm')]
-            parts = itertools.groupby(
-                path, key=lambda pos: highlight_style(highlight[pos]))
-            for (stroke, pen), part in parts:
-                for ii, jj in part:
+            hi = highlight[i, j]
+            for ii, jj in path:
+                if highlight[ii, jj] == hi:
                     cur_path.append((ii, jj, 'l'))
-                group.path(cur_path, stroke=stroke, pen=pen)
-                cur_path = [(ii, jj, 'm')]
+                elif highlight[ii, jj] | hi == hi:
+                    # Switching to lesser highlight: don't include (ii,jj)
+                    if len(cur_path) > 1:
+                        group.path(cur_path, **highlight_style(hi))
+                    cur_path = [(cur_path[-1][0], cur_path[-1][1], 'm'),
+                                (ii, jj, 'l')]
+                else:
+                    # Switching to more highlight: include (ii,jj)
+                    cur_path.append((ii, jj, 'l'))
+                    if len(cur_path) > 1:
+                        group.path(cur_path, **highlight_style(hi))
+                    cur_path = [(ii, jj, 'm')]
+                hi = highlight[ii, jj]
+            if len(cur_path) > 1:
+                group.path(cur_path, **highlight_style(hi))
     for i, row in enumerate(dirs):
         for j, dir in enumerate(row):
             if dir == 0:
