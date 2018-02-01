@@ -442,9 +442,12 @@ def output_dirs(group, image, dirs, highlight, subtree_size, child_dir,
             cur_path = [(i, j, 'm')]
             hi = highlight[i, j]
             for ii, jj in path:
-                if highlight[ii, jj] == hi:
+                hi2 = highlight[ii, jj]
+                if hi2 != hi and highlight_style(hi2) == highlight_style(hi):
+                    hi = hi2
+                if hi2 == hi:
                     cur_path.append((ii, jj, 'l'))
-                elif highlight[ii, jj] | hi == hi:
+                elif hi2 | hi == hi:
                     # Switching to lesser highlight: don't include (ii,jj)
                     if len(cur_path) > 1:
                         group.path(cur_path, **highlight_style(hi))
