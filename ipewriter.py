@@ -97,3 +97,10 @@ class IpeDoc:
     def mark(self, x, y, name, **attrs):
         self.print('<use name="mark/%s(sx)" pos="%s %s"' % (name, x, y) +
                    '%s/>' % ''.join(' %s="%s"' % kv for kv in attrs.items()))
+
+    def text(self, x, y, content, **attrs):
+        attrs.setdefault('type', 'label')
+        attrs['pos'] = '%s %s' % (x, y)
+        self.print('<text%s>%s</text>' %
+                   (''.join(' %s="%s"' % kv for kv in attrs.items()),
+                    content))
