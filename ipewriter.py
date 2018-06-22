@@ -10,10 +10,10 @@ import numpy as np
 PROG_NAME = 'python-ipe'
 
 
-class IpeDoc:
+class IpeStyleMixin:
     def read_ipestyle(self, name='basic'):
         filename = '/usr/share/ipe/%s/styles/%s.isy' % (
-            '.'.join(map(str, self.version)), name)
+            '.'.join(map(str, self.ipe_version)), name)
         with open(filename) as fp:
             xml_ver = fp.readline()
             doctype = fp.readline()
@@ -21,32 +21,43 @@ class IpeDoc:
             assert doctype == '<!DOCTYPE ipestyle SYSTEM "ipe.dtd">\n'
             return fp.read().rstrip()
 
-    @classmethod
-    def find_version(cls):
+    def _find_version():
         mo = max((re.match(r'^(\d+)\.(\d+)\.(\d+)$', v)
                   for v in os.listdir('/usr/share/ipe')),
                  key=lambda mo: (mo is not None, mo and mo.group(0)))
         return tuple(map(int, mo.group(1, 2, 3)))
 
+    ipe_version = _find_version()
+
+    def get_preamble(self, prog_name=PROG_NAME):
+        version = '%d%02d%02d' % self.ipe_version
+        t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+        return (
+            '<?xml version="1.0"?>\n' +
+            '<!DOCTYPE ipe SYSTEM "ipe.dtd">\n' +
+            '<ipe version="%s" creator="%s">\n' % (version, prog_name) +
+            '<info created="D:%s" modified="D:%s"/>\n' % (t, t)
+        )
+
+    def get_postamble(self):
+        return '</ipe>\n'
+
+
+class IpeDoc(IpeStyleMixin):
     def __init__(self, output_fp):
+        super().__init__()
         self.output_fp = output_fp
         self.bitmaps = []
-        self.version = self.find_version()
 
     def print(self, *args, **kwargs):
         print(*args, **kwargs, file=self.output_fp)
 
     def __enter__(self):
-        self.print('<?xml version="1.0"?>')
-        self.print('<!DOCTYPE ipe SYSTEM "ipe.dtd">')
-        version = '%d%02d%02d' % self.version
-        self.print('<ipe version="%s" creator="%s">' % (version, PROG_NAME))
-        t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-        self.print('<info created="D:%s" modified="D:%s"/>' % (t, t))
+        self.print(self.get_preamble().rstrip('\n'))
         return self
 
     def __exit__(self, et, ev, eb):
-        self.print('</ipe>')
+        self.print(self.get_postamble().rstrip('\n'))
 
     def add_bitmap(self, data):
         assert data.dtype == np.uint8, data.dtype
