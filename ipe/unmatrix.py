@@ -6,7 +6,9 @@ from xml.etree import ElementTree
 import ipe.shape
 
 
-def recursive_apply_matrix(root, matrix):
+def unmatrix(root, matrix=None):
+    if matrix is None:
+        matrix = ipe.shape.MatrixTransform.identity()
     if 'matrix' in root.attrib:
         m = ipe.shape.load_matrix(root.attrib['matrix'])
         del root.attrib['matrix']
@@ -15,7 +17,7 @@ def recursive_apply_matrix(root, matrix):
         root.text = ipe.shape.apply_matrix_to_shape(root.text, matrix)
     elif root.tag == 'group':
         for child in root:
-            recursive_apply_matrix(child, matrix)
+            unmatrix(child, matrix)
     elif root.tag in ('text', 'use'):
         x, y = root.attrib['pos'].split()
         x, y = matrix.transform(float(x), float(y))
@@ -27,7 +29,7 @@ def main():
     args = parser.parse_args()
     d = sys.stdin.read()
     root = ElementTree.fromstring(d)
-    recursive_apply_matrix(root, ipe.shape.MatrixTransform.identity())
+    unmatrix(root)
     print(ElementTree.tostring(root).decode())
 
 
