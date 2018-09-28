@@ -23,11 +23,11 @@ def main():
     s = sys.stdin.read()
     tree = ET.fromstring(s)
     assert tree.tag == "ipeselection"
-    path, text = sorted(tree, key=lambda n: n.tag)
+    path, point = sorted(tree, key=lambda n: n.tag)
     assert path.tag == "path"
-    assert text.tag == "text"
+    assert point.tag in ("text", "use")
     px, py = get_origin(path)
-    tx, ty = get_origin(text)
+    tx, ty = get_origin(point)
     path.set("matrix", "1 0 0 1 %g %g" % (tx, ty))
 
     def translate(mo):
